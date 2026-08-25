@@ -26,8 +26,10 @@
         {% endfor %}
     </div>
     <p class="dica">
-        Selecionar um modelo preenche os campos abaixo — você ainda pode
-        ajustar o texto antes de enviar.
+        <strong>Selecionar um modelo só preenche os campos abaixo — nada é
+        enviado nesse momento.</strong> Confira e ajuste o texto se
+        precisar; o aviso só sai de fato quando você clicar em "Enviar
+        para todos" e confirmar.
         <a href="{{ url_for('modelos') }}">Gerenciar modelos</a>
     </p>
     {% else %}
@@ -36,7 +38,7 @@
     </p>
     {% endif %}
 
-    <form method="post">
+    <form method="post" onsubmit="return confirmarEnvio()">
         <label>Título (opcional)</label>
         <input type="text" id="campoTitulo" name="titulo" placeholder="Aviso da HOTNET" maxlength="80">
 
@@ -57,6 +59,11 @@
     function preencherModelo(titulo, mensagem) {
         document.getElementById('campoTitulo').value = titulo;
         document.getElementById('campoMensagem').value = mensagem;
+    }
+
+    function confirmarEnvio() {
+        const mensagem = document.getElementById('campoMensagem').value;
+        return confirm('Confirma o envio deste aviso para TODOS os usuários agora?\n\n' + mensagem);
     }
 </script>
 {% endblock %}

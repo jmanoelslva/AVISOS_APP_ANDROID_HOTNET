@@ -60,7 +60,7 @@ def login():
     cfg = config_store.carregar()
     ip = _ip_do_cliente()
     _, bloqueado_ate = _tentativas_login.get(ip, (0, 0.0))
-    primeira_vez = not (cfg.get("username") and cfg.get("password_hash"))
+    primeira_vez = not cfg.get("usuarios")
 
     if time.time() < bloqueado_ate:
         flash("Muitas tentativas erradas. Tente de novo em alguns minutos.")
@@ -69,14 +69,12 @@ def login():
     if request.method == "POST":
         usuario = request.form.get("usuario", "")
         senha = request.form.get("senha", "")
-        credenciais_ok = (
-            cfg.get("username")
-            and cfg.get("password_hash")
-            and usuario == cfg["username"]
-            and check_password_hash(cfg["password_hash"], senha)
+        entrada = next(
+            (u for u in cfg.get("usuarios", []) if u["username"] == usuario), None
         )
-        if credenciais_ok:
+        if entrada and check_password_hash(entrada["password_hash"], senha):
             session["autenticado"] = True
+            session["usuario"] = usuario
             _tentativas_login.pop(ip, None)
             return redirect(url_for("dashboard"))
 
@@ -91,10 +89,12 @@ def login():
 
 @app.route("/definir-senha", methods=["POST"])
 def definir_senha_inicial():
-    # Só é permitido enquanto nenhum usuário/senha tiver sido configurado
-    # ainda (primeiro uso do painel, se não foi feito via install.sh).
+    # Só é permitido enquanto nenhum usuário tiver sido criado ainda
+    # (primeiro uso do painel, se não foi feito via install.sh). Depois
+    # disso, novos usuários só podem ser criados em Configurações, já
+    # logado.
     cfg = config_store.carregar()
-    if cfg.get("username") and cfg.get("password_hash"):
+    if cfg.get("usuarios"):
         abort(403)
 
     usuario = request.form.get("usuario", "").strip()
@@ -110,8 +110,7 @@ def definir_senha_inicial():
         flash("Não atende aos requisitos: " + ", ".join(problemas))
         return redirect(url_for("login"))
 
-    cfg["username"] = usuario
-    cfg["password_hash"] = generate_password_hash(senha)
+    cfg["usuarios"] = [{"username": usuario, "password_hash": generate_password_hash(senha)}]
     config_store.salvar(cfg)
     flash("Usuário e senha definidos com sucesso. Faça login.")
     return redirect(url_for("login"))
@@ -166,6 +165,28 @@ def modelos():
                 config_store.salvar(cfg)
                 flash("Modelo criado com sucesso.")
 
+        elif acao == "editar":
+            template_id = request.form.get("id")
+            nome = request.form.get("nome", "").strip()
+            titulo = request.form.get("titulo", "").strip() or "Aviso da HOTNET"
+            mensagem = request.form.get("mensagem", "").strip()
+            if not nome or not mensagem:
+                flash("Preencha o nome do modelo e a mensagem.")
+            else:
+                encontrado = False
+                for t in cfg.get("templates", []):
+                    if t.get("id") == template_id:
+                        t["nome"] = nome
+                        t["titulo"] = titulo
+                        t["mensagem"] = mensagem
+                        encontrado = True
+                        break
+                if encontrado:
+                    config_store.salvar(cfg)
+                    flash("Modelo atualizado com sucesso.")
+                else:
+                    flash("Modelo não encontrado.")
+
         elif acao == "excluir":
             template_id = request.form.get("id")
             antes = len(cfg.get("templates", []))
@@ -187,26 +208,65 @@ def configuracoes():
     if request.method == "POST":
         acao = request.form.get("acao")
 
+        usuario_logado = session.get("usuario")
+        entrada_logada = next(
+            (u for u in cfg.get("usuarios", []) if u["username"] == usuario_logado), None
+        )
+
         if acao == "senha":
             atual = request.form.get("senha_atual", "")
-            novo_usuario = request.form.get("novo_usuario", "").strip()
             nova = request.form.get("nova_senha", "")
             confirmacao = request.form.get("confirmacao", "")
-            if not check_password_hash(cfg["password_hash"], atual):
+            if not entrada_logada or not check_password_hash(entrada_logada["password_hash"], atual):
                 flash("Senha atual incorreta.")
             else:
                 problemas = validar_forca_senha(nova)
-                if not novo_usuario:
-                    problemas.append("informe um usuário")
                 if nova != confirmacao:
                     problemas.append("as senhas não coincidem")
                 if problemas:
                     flash("Não atende aos requisitos: " + ", ".join(problemas))
                 else:
-                    cfg["username"] = novo_usuario
-                    cfg["password_hash"] = generate_password_hash(nova)
+                    entrada_logada["password_hash"] = generate_password_hash(nova)
                     config_store.salvar(cfg)
-                    flash("Usuário e senha atualizados com sucesso.")
+                    flash("Senha atualizada com sucesso.")
+
+        elif acao == "novo_usuario":
+            senha_confirmacao = request.form.get("senha_atual_novo_usuario", "")
+            if not entrada_logada or not check_password_hash(entrada_logada["password_hash"], senha_confirmacao):
+                flash("Sua senha atual está incorreta — confirmação necessária pra criar um novo usuário.")
+            else:
+                novo_nome = request.form.get("novo_usuario_nome", "").strip()
+                nova_senha = request.form.get("novo_usuario_senha", "")
+                nova_confirmacao = request.form.get("novo_usuario_confirmacao", "")
+                problemas = validar_forca_senha(nova_senha)
+                if not novo_nome:
+                    problemas.append("informe um nome de usuário")
+                elif any(u["username"] == novo_nome for u in cfg.get("usuarios", [])):
+                    problemas.append("esse nome de usuário já existe")
+                if nova_senha != nova_confirmacao:
+                    problemas.append("as senhas não coincidem")
+                if problemas:
+                    flash("Não atende aos requisitos: " + ", ".join(problemas))
+                else:
+                    cfg.setdefault("usuarios", []).append({
+                        "username": novo_nome,
+                        "password_hash": generate_password_hash(nova_senha),
+                    })
+                    config_store.salvar(cfg)
+                    flash(f"Usuário \"{novo_nome}\" criado com sucesso.")
+
+        elif acao == "remover_usuario":
+            alvo = request.form.get("usuario_remover", "")
+            if len(cfg.get("usuarios", [])) <= 1:
+                flash("Não é possível remover o único usuário existente.")
+            elif alvo == usuario_logado:
+                flash("Você não pode remover seu próprio usuário enquanto estiver logado com ele.")
+            else:
+                antes = len(cfg.get("usuarios", []))
+                cfg["usuarios"] = [u for u in cfg.get("usuarios", []) if u["username"] != alvo]
+                if len(cfg["usuarios"]) < antes:
+                    config_store.salvar(cfg)
+                    flash(f"Usuário \"{alvo}\" removido.")
 
         elif acao == "porta":
             try:
@@ -242,7 +302,8 @@ def configuracoes():
 
     return render_template(
         "settings.html",
-        usuario_atual=cfg.get("username", ""),
+        usuario_atual=session.get("usuario", ""),
+        usuarios=cfg.get("usuarios", []),
         porta_atual=cfg.get("port", config_store.DEFAULT_PORT),
         allowed_ips="\n".join(cfg.get("allowed_ips") or []),
     )

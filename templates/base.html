@@ -101,6 +101,33 @@
             white-space: nowrap;
         }
         .botao-remover:hover { background: #8E1515; }
+        .botao-secundario {
+            background: #999;
+            margin-top: 0;
+            white-space: nowrap;
+        }
+        .botao-secundario:hover { background: #777; }
+        .acoes-modelo {
+            display: flex;
+            gap: 8px;
+            flex-shrink: 0;
+        }
+        .acoes-modelo form { margin: 0; }
+        .lista-usuarios {
+            list-style: none;
+            padding: 0;
+            margin: 0 0 20px;
+        }
+        .lista-usuarios li {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px 0;
+            border-top: 1px solid #EEE;
+            font-size: 14px;
+        }
+        .lista-usuarios li:first-child { border-top: none; padding-top: 0; }
+        .lista-usuarios form { margin: 0; }
     </style>
 </head>
 <body>

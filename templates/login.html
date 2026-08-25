@@ -3,11 +3,12 @@
 {% block conteudo %}
 <div class="card">
     {% if primeira_vez %}
-        <h2>Defina o usuário e a senha de acesso</h2>
+        <h2>Defina o primeiro usuário do painel</h2>
         <p class="dica">
-            Primeiro acesso — crie o usuário e a senha do painel. Senha
-            com mínimo 8 caracteres, maiúscula, minúscula, número e
-            caractere especial.
+            Primeiro acesso — crie o usuário e a senha administrador do
+            painel (outros usuários podem ser adicionados depois em
+            Configurações). Senha com mínimo 8 caracteres, maiúscula,
+            minúscula, número e caractere especial.
         </p>
         <form method="post" action="{{ url_for('definir_senha_inicial') }}">
             <label>Usuário</label>

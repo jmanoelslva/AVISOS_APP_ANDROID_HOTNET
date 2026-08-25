@@ -3,19 +3,22 @@
 {% block conteudo %}
 
 <div class="card">
-    <h2>Novo modelo</h2>
-    <form method="post">
-        <input type="hidden" name="acao" value="criar">
+    <h2 id="tituloFormModelo">Novo modelo</h2>
+    <form method="post" id="formModelo">
+        <input type="hidden" name="acao" id="campoAcao" value="criar">
+        <input type="hidden" name="id" id="campoId" value="">
+
         <label>Nome do modelo (só pra você identificar na lista)</label>
-        <input type="text" name="nome" required maxlength="60" placeholder="Ex: Manutenção programada">
+        <input type="text" name="nome" id="campoNome" required maxlength="60" placeholder="Ex: Manutenção programada">
 
         <label>Título da notificação (opcional)</label>
-        <input type="text" name="titulo" maxlength="80" placeholder="Aviso da HOTNET">
+        <input type="text" name="titulo" id="campoTituloModelo" maxlength="80" placeholder="Aviso da HOTNET">
 
         <label>Mensagem</label>
-        <textarea name="mensagem" required maxlength="500" placeholder="Texto que vai no corpo da notificação"></textarea>
+        <textarea name="mensagem" id="campoMensagemModelo" required maxlength="500" placeholder="Texto que vai no corpo da notificação"></textarea>
 
-        <button type="submit">Criar modelo</button>
+        <button type="submit" id="botaoSalvarModelo">Criar modelo</button>
+        <button type="button" id="botaoCancelarEdicao" class="botao-secundario" onclick="cancelarEdicao()" style="display:none;">Cancelar edição</button>
     </form>
 </div>
 
@@ -28,11 +31,17 @@
                 <strong>{{ t.nome }}</strong>
                 <p class="dica">{{ t.mensagem }}</p>
             </div>
-            <form method="post" onsubmit="return confirm('Remover este modelo?')">
-                <input type="hidden" name="acao" value="excluir">
-                <input type="hidden" name="id" value="{{ t.id }}">
-                <button type="submit" class="botao-remover">Remover</button>
-            </form>
+            <div class="acoes-modelo">
+                <button type="button" class="botao-secundario"
+                        onclick="editarModelo({{ t.id|tojson }}, {{ t.nome|tojson }}, {{ t.titulo|tojson }}, {{ t.mensagem|tojson }})">
+                    Editar
+                </button>
+                <form method="post" onsubmit="return confirm('Remover este modelo?')">
+                    <input type="hidden" name="acao" value="excluir">
+                    <input type="hidden" name="id" value="{{ t.id }}">
+                    <button type="submit" class="botao-remover">Remover</button>
+                </form>
+            </div>
         </div>
         {% endfor %}
     {% else %}
@@ -40,4 +49,28 @@
     {% endif %}
 </div>
 
+<script>
+    function editarModelo(id, nome, titulo, mensagem) {
+        document.getElementById('campoAcao').value = 'editar';
+        document.getElementById('campoId').value = id;
+        document.getElementById('campoNome').value = nome;
+        document.getElementById('campoTituloModelo').value = titulo;
+        document.getElementById('campoMensagemModelo').value = mensagem;
+        document.getElementById('tituloFormModelo').innerText = 'Editar modelo';
+        document.getElementById('botaoSalvarModelo').innerText = 'Salvar alterações';
+        document.getElementById('botaoCancelarEdicao').style.display = 'inline-block';
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    function cancelarEdicao() {
+        document.getElementById('campoAcao').value = 'criar';
+        document.getElementById('campoId').value = '';
+        document.getElementById('campoNome').value = '';
+        document.getElementById('campoTituloModelo').value = '';
+        document.getElementById('campoMensagemModelo').value = '';
+        document.getElementById('tituloFormModelo').innerText = 'Novo modelo';
+        document.getElementById('botaoSalvarModelo').innerText = 'Criar modelo';
+        document.getElementById('botaoCancelarEdicao').style.display = 'none';
+    }
+</script>
 {% endblock %}

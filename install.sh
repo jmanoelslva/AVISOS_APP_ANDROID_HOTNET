@@ -91,8 +91,10 @@ import config_store
 from werkzeug.security import generate_password_hash
 
 cfg = config_store.carregar()
-cfg["username"] = sys.argv[2]
-cfg["password_hash"] = generate_password_hash(sys.argv[3])
+cfg["usuarios"] = [{
+    "username": sys.argv[2],
+    "password_hash": generate_password_hash(sys.argv[3]),
+}]
 cfg["port"] = int(sys.argv[4])
 config_store.salvar(cfg)
 print("Configuração inicial salva.")

@@ -74,8 +74,7 @@ def _templates_padrao() -> list[dict]:
 
 def _gerar_config_padrao() -> dict:
     return {
-        "username": None,
-        "password_hash": None,
+        "usuarios": [],  # lista de {"username": ..., "password_hash": ...}
         "port": DEFAULT_PORT,
         "allowed_ips": [],
         "secret_key": secrets.token_hex(32),
@@ -111,6 +110,24 @@ def carregar() -> dict:
             if not _config_cache.get("templates"):
                 _config_cache["templates"] = _templates_padrao()
             _config_cache["templates_seed_aplicado"] = True
+            alterou = True
+        # Migra o usuário único (versões anteriores, com "username" e
+        # "password_hash" soltos) pra dentro da lista "usuarios" — feito
+        # uma vez só, já que depois disso as chaves antigas são removidas.
+        if "username" in _config_cache or "password_hash" in _config_cache:
+            usuario_antigo = _config_cache.get("username")
+            hash_antigo = _config_cache.get("password_hash")
+            if usuario_antigo and hash_antigo:
+                ja_existe = any(
+                    u["username"] == usuario_antigo for u in _config_cache.get("usuarios", [])
+                )
+                if not ja_existe:
+                    _config_cache.setdefault("usuarios", []).append({
+                        "username": usuario_antigo,
+                        "password_hash": hash_antigo,
+                    })
+            _config_cache.pop("username", None)
+            _config_cache.pop("password_hash", None)
             alterou = True
         if alterou:
             salvar(_config_cache)

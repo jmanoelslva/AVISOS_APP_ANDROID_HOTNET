@@ -83,6 +83,11 @@ diretamente na tela de login.
 4. Se quiser mudar a porta depois, salve o novo valor em Configurações
    e rode `systemctl restart aviso-broadcaster` (a porta só é lida na
    inicialização do processo).
+5. Pra dar acesso a mais pessoas, use "Adicionar novo usuário" em
+   Configurações (pede sua própria senha atual como confirmação). Cada
+   usuário só consegue trocar a própria senha e não consegue remover a
+   si mesmo nem o último usuário restante, pra evitar ficar todo mundo
+   trancado pra fora.
 
 ## 4. Importante — use HTTPS na frente
 
@@ -127,8 +132,10 @@ systemctl start aviso-broadcaster
 systemctl status aviso-broadcaster
 ```
 
-O `config.json` ganha a chave nova de modelos (`templates`) sozinho, sem
-apagar usuário/senha/porta/IPs já configurados.
+O `config.json` se atualiza sozinho: ganha a chave de modelos
+(`templates`) e migra o usuário/senha único de versões antigas pra uma
+lista de usuários (`usuarios`), sem apagar nada que já estava
+configurado (porta, IPs, senha do usuário original).
 
 ## 7. Desinstalar
 

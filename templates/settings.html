@@ -3,19 +3,51 @@
 {% block conteudo %}
 
 <div class="card">
-    <h2>Alterar usuário e senha</h2>
+    <h2>Alterar minha senha</h2>
+    <p class="dica">Logado como: <strong>{{ usuario_atual }}</strong></p>
     <form method="post">
         <input type="hidden" name="acao" value="senha">
         <label>Senha atual</label>
         <input type="password" name="senha_atual" required>
-        <label>Usuário</label>
-        <input type="text" name="novo_usuario" value="{{ usuario_atual }}" required>
         <label>Nova senha</label>
         <input type="password" name="nova_senha" required minlength="8">
         <label>Confirmar nova senha</label>
         <input type="password" name="confirmacao" required minlength="8">
-        <p class="dica">Senha com mínimo 8 caracteres, maiúscula, minúscula, número e caractere especial.</p>
-        <button type="submit">Salvar</button>
+        <p class="dica">Mínimo 8 caracteres, com maiúscula, minúscula, número e caractere especial.</p>
+        <button type="submit">Salvar senha</button>
+    </form>
+</div>
+
+<div class="card">
+    <h2>Usuários do painel</h2>
+    <ul class="lista-usuarios">
+        {% for u in usuarios %}
+        <li>
+            <span>{{ u.username }}{% if u.username == usuario_atual %} <span class="dica">(você)</span>{% endif %}</span>
+            {% if u.username != usuario_atual and usuarios|length > 1 %}
+            <form method="post" onsubmit="return confirm('Remover o usuário {{ u.username }}?')">
+                <input type="hidden" name="acao" value="remover_usuario">
+                <input type="hidden" name="usuario_remover" value="{{ u.username }}">
+                <button type="submit" class="botao-remover">Remover</button>
+            </form>
+            {% endif %}
+        </li>
+        {% endfor %}
+    </ul>
+
+    <h2>Adicionar novo usuário</h2>
+    <form method="post">
+        <input type="hidden" name="acao" value="novo_usuario">
+        <label>Sua senha atual (confirmação de segurança)</label>
+        <input type="password" name="senha_atual_novo_usuario" required>
+        <label>Nome do novo usuário</label>
+        <input type="text" name="novo_usuario_nome" required maxlength="60">
+        <label>Senha do novo usuário</label>
+        <input type="password" name="novo_usuario_senha" required minlength="8">
+        <label>Confirmar senha</label>
+        <input type="password" name="novo_usuario_confirmacao" required minlength="8">
+        <p class="dica">Mínimo 8 caracteres, com maiúscula, minúscula, número e caractere especial.</p>
+        <button type="submit">Criar usuário</button>
     </form>
 </div>
 
