@@ -1,0 +1,129 @@
+<!doctype html>
+<html lang="pt-br">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{% block titulo %}Aviso Broadcaster{% endblock %}</title>
+    <style>
+        :root { color-scheme: light; }
+        * { box-sizing: border-box; }
+        body {
+            margin: 0;
+            font-family: -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+            background: #F5F5F5;
+            color: #333;
+        }
+        header {
+            background: linear-gradient(135deg, #D94A38, #F28F3B);
+            color: #fff;
+            padding: 16px 24px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+        header a { color: #fff; text-decoration: none; margin-left: 16px; font-size: 14px; }
+        header a:hover { text-decoration: underline; }
+        header h1 { margin: 0; font-size: 18px; }
+        main { max-width: 640px; margin: 32px auto; padding: 0 16px; }
+        .card {
+            background: #fff;
+            border-radius: 12px;
+            padding: 24px;
+            box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+            margin-bottom: 20px;
+        }
+        h2 { margin-top: 0; font-size: 17px; }
+        label { display: block; margin: 12px 0 4px; font-size: 13px; font-weight: bold; color: #555; }
+        input[type=text], input[type=password], input[type=number], textarea {
+            width: 100%;
+            padding: 10px 12px;
+            border: 1px solid #E0E0E0;
+            border-radius: 8px;
+            font-size: 14px;
+            font-family: inherit;
+        }
+        textarea { min-height: 100px; resize: vertical; }
+        button {
+            margin-top: 16px;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 8px;
+            background: #F28F3B;
+            color: #fff;
+            font-weight: bold;
+            font-size: 14px;
+            cursor: pointer;
+        }
+        button:hover { background: #D94A38; }
+        .flash {
+            padding: 12px 16px;
+            border-radius: 8px;
+            margin-bottom: 16px;
+            font-size: 14px;
+            background: #FFF3E0;
+            color: #7A4B00;
+            border: 1px solid #FFD08A;
+        }
+        .aviso-acl { font-size: 12px; color: #999; margin-top: 4px; }
+        .dica { font-size: 13px; color: #777; }
+        .dica a { color: #D94A38; }
+        .lista-modelos {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            margin-top: 6px;
+        }
+        .opcao-modelo {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 14px;
+            font-weight: normal;
+            color: #333;
+            margin: 0;
+        }
+        .opcao-modelo input { width: auto; }
+        .item-modelo {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            gap: 12px;
+            padding: 12px 0;
+            border-top: 1px solid #EEE;
+        }
+        .item-modelo:first-child { border-top: none; padding-top: 0; }
+        .item-modelo p { margin: 4px 0 0; }
+        .botao-remover {
+            background: #B71C1C;
+            margin-top: 0;
+            white-space: nowrap;
+        }
+        .botao-remover:hover { background: #8E1515; }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>Aviso Broadcaster — HOTNET</h1>
+        {% if session.get('autenticado') %}
+        <nav>
+            <a href="{{ url_for('dashboard') }}">Enviar aviso</a>
+            <a href="{{ url_for('modelos') }}">Modelos</a>
+            <a href="{{ url_for('configuracoes') }}">Configurações</a>
+            <a href="{{ url_for('logout') }}">Sair</a>
+        </nav>
+        {% endif %}
+    </header>
+    <main>
+        {% with mensagens = get_flashed_messages() %}
+            {% if mensagens %}
+                {% for m in mensagens %}
+                    <div class="flash">{{ m }}</div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+        {% block conteudo %}{% endblock %}
+    </main>
+</body>
+</html>

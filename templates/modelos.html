@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+{% block titulo %}Modelos de mensagem{% endblock %}
+{% block conteudo %}
+
+<div class="card">
+    <h2>Novo modelo</h2>
+    <form method="post">
+        <input type="hidden" name="acao" value="criar">
+        <label>Nome do modelo (só pra você identificar na lista)</label>
+        <input type="text" name="nome" required maxlength="60" placeholder="Ex: Manutenção programada">
+
+        <label>Título da notificação (opcional)</label>
+        <input type="text" name="titulo" maxlength="80" placeholder="Aviso da HOTNET">
+
+        <label>Mensagem</label>
+        <textarea name="mensagem" required maxlength="500" placeholder="Texto que vai no corpo da notificação"></textarea>
+
+        <button type="submit">Criar modelo</button>
+    </form>
+</div>
+
+<div class="card">
+    <h2>Modelos cadastrados</h2>
+    {% if templates %}
+        {% for t in templates %}
+        <div class="item-modelo">
+            <div>
+                <strong>{{ t.nome }}</strong>
+                <p class="dica">{{ t.mensagem }}</p>
+            </div>
+            <form method="post" onsubmit="return confirm('Remover este modelo?')">
+                <input type="hidden" name="acao" value="excluir">
+                <input type="hidden" name="id" value="{{ t.id }}">
+                <button type="submit" class="botao-remover">Remover</button>
+            </form>
+        </div>
+        {% endfor %}
+    {% else %}
+        <p class="dica">Nenhum modelo cadastrado ainda.</p>
+    {% endif %}
+</div>
+
+{% endblock %}

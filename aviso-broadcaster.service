@@ -1,0 +1,15 @@
+[Unit]
+Description=Aviso Broadcaster - HOTNET
+After=network.target
+
+[Service]
+Type=simple
+User=aviso-broadcaster
+WorkingDirectory=/opt/aviso-broadcaster
+Environment="PATH=/opt/aviso-broadcaster/venv/bin"
+ExecStart=/opt/aviso-broadcaster/venv/bin/gunicorn --config gunicorn.conf.py app:app
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

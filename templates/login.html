@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% block titulo %}Login — Aviso Broadcaster{% endblock %}
+{% block conteudo %}
+<div class="card">
+    {% if primeira_vez %}
+        <h2>Defina o usuário e a senha de acesso</h2>
+        <p class="dica">
+            Primeiro acesso — crie o usuário e a senha do painel. Senha
+            com mínimo 8 caracteres, maiúscula, minúscula, número e
+            caractere especial.
+        </p>
+        <form method="post" action="{{ url_for('definir_senha_inicial') }}">
+            <label>Usuário</label>
+            <input type="text" name="usuario" required autofocus>
+            <label>Senha</label>
+            <input type="password" name="senha" required minlength="8">
+            <label>Confirmar senha</label>
+            <input type="password" name="confirmacao" required minlength="8">
+            <button type="submit">Definir usuário e senha</button>
+        </form>
+    {% else %}
+        <h2>Entrar</h2>
+        <form method="post">
+            <label>Usuário</label>
+            <input type="text" name="usuario" required autofocus>
+            <label>Senha</label>
+            <input type="password" name="senha" required>
+            <button type="submit">Entrar</button>
+        </form>
+    {% endif %}
+</div>
+{% endblock %}

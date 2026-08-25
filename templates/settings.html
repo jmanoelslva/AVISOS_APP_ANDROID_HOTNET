@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+{% block titulo %}Configurações{% endblock %}
+{% block conteudo %}
+
+<div class="card">
+    <h2>Alterar usuário e senha</h2>
+    <form method="post">
+        <input type="hidden" name="acao" value="senha">
+        <label>Senha atual</label>
+        <input type="password" name="senha_atual" required>
+        <label>Usuário</label>
+        <input type="text" name="novo_usuario" value="{{ usuario_atual }}" required>
+        <label>Nova senha</label>
+        <input type="password" name="nova_senha" required minlength="8">
+        <label>Confirmar nova senha</label>
+        <input type="password" name="confirmacao" required minlength="8">
+        <p class="dica">Senha com mínimo 8 caracteres, maiúscula, minúscula, número e caractere especial.</p>
+        <button type="submit">Salvar</button>
+    </form>
+</div>
+
+<div class="card">
+    <h2>Porta do servidor</h2>
+    <form method="post">
+        <input type="hidden" name="acao" value="porta">
+        <label>Porta atual: {{ porta_atual }}</label>
+        <input type="number" name="porta" min="1" max="65535" value="{{ porta_atual }}" required>
+        <p class="dica">Alterar a porta exige reiniciar o serviço pra valer: <code>systemctl restart aviso-broadcaster</code></p>
+        <button type="submit">Salvar porta</button>
+    </form>
+</div>
+
+<div class="card">
+    <h2>IPs permitidos (ACL)</h2>
+    <form method="post">
+        <input type="hidden" name="acao" value="acl">
+        <label>Um IP ou faixa CIDR por linha (ex: 203.0.113.10 ou 203.0.113.0/24)</label>
+        <textarea name="allowed_ips" placeholder="Deixe vazio pra permitir qualquer IP (não recomendado)">{{ allowed_ips }}</textarea>
+        <p class="aviso-acl">Vazio = sem restrição de IP. Recomendado sempre configurar pelo menos o seu IP fixo ou a faixa da sua rede.</p>
+        <button type="submit">Salvar lista de IPs</button>
+    </form>
+</div>
+
+{% endblock %}

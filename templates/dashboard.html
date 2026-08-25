@@ -1,0 +1,62 @@
+{% extends "base.html" %}
+{% block titulo %}Enviar aviso{% endblock %}
+{% block conteudo %}
+<div class="card">
+    <h2>Enviar aviso para todos os usuários</h2>
+    <p class="dica">
+        A mensagem chega como notificação push pra todo mundo que tem o
+        app instalado — use pra avisos de manutenção programada ou
+        instabilidade na rede.
+    </p>
+
+    {% if templates %}
+    <label>Modelo pronto (opcional)</label>
+    <div class="lista-modelos">
+        <label class="opcao-modelo">
+            <input type="radio" name="modelo_radio" value="" checked
+                   onchange="preencherModelo('', '')">
+            Escrever mensagem própria
+        </label>
+        {% for t in templates %}
+        <label class="opcao-modelo">
+            <input type="radio" name="modelo_radio" value="{{ t.id }}"
+                   onchange="preencherModelo({{ t.titulo|tojson }}, {{ t.mensagem|tojson }})">
+            {{ t.nome }}
+        </label>
+        {% endfor %}
+    </div>
+    <p class="dica">
+        Selecionar um modelo preenche os campos abaixo — você ainda pode
+        ajustar o texto antes de enviar.
+        <a href="{{ url_for('modelos') }}">Gerenciar modelos</a>
+    </p>
+    {% else %}
+    <p class="dica">
+        Nenhum modelo pronto cadastrado ainda. <a href="{{ url_for('modelos') }}">Criar o primeiro modelo</a>
+    </p>
+    {% endif %}
+
+    <form method="post">
+        <label>Título (opcional)</label>
+        <input type="text" id="campoTitulo" name="titulo" placeholder="Aviso da HOTNET" maxlength="80">
+
+        <label>Mensagem</label>
+        <textarea
+            id="campoMensagem"
+            name="mensagem"
+            required
+            maxlength="500"
+            placeholder="Ex: Manutenção programada hoje das 23h às 01h na região X. A conexão pode oscilar nesse período."
+        ></textarea>
+
+        <button type="submit">Enviar para todos</button>
+    </form>
+</div>
+
+<script>
+    function preencherModelo(titulo, mensagem) {
+        document.getElementById('campoTitulo').value = titulo;
+        document.getElementById('campoMensagem').value = mensagem;
+    }
+</script>
+{% endblock %}
