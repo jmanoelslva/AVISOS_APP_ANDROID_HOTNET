@@ -84,10 +84,15 @@ diretamente na tela de login.
    e rode `systemctl restart aviso-broadcaster` (a porta só é lida na
    inicialização do processo).
 5. Pra dar acesso a mais pessoas, use "Adicionar novo usuário" em
-   Configurações (pede sua própria senha atual como confirmação). Cada
-   usuário só consegue trocar a própria senha e não consegue remover a
-   si mesmo nem o último usuário restante, pra evitar ficar todo mundo
-   trancado pra fora.
+   Configurações (pede sua própria senha atual como confirmação). Não
+   dá pra remover a si mesmo nem o último usuário restante, pra evitar
+   ficar todo mundo trancado pra fora. **A página de Configurações
+   (porta, IPs, usuários, trocar senha) só fica visível e acessível
+   pra quem é o usuário administrador** (o primeiro criado, marcado
+   como "admin" na lista) — os demais usuários só veem as abas
+   "Enviar aviso", "Modelos" e "Logs", e não têm como trocar a própria
+   senha sozinhos (precisam pedir pro admin remover e recriar o
+   usuário, por enquanto).
 
 ## 4. Importante — use HTTPS na frente
 

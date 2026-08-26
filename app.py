@@ -63,6 +63,32 @@ def login_obrigatorio(f):
     return wrapper
 
 
+def _entrada_usuario_logado(cfg: dict) -> dict | None:
+    usuario_logado = session.get("usuario")
+    return next(
+        (u for u in cfg.get("usuarios", []) if u["username"] == usuario_logado), None
+    )
+
+
+def admin_obrigatorio(f):
+    @wraps(f)
+    def wrapper(*args, **kwargs):
+        cfg = config_store.carregar()
+        entrada = _entrada_usuario_logado(cfg)
+        if not entrada or not entrada.get("is_admin"):
+            flash("Apenas o administrador tem acesso a essa página.", "erro")
+            return redirect(url_for("dashboard"))
+        return f(*args, **kwargs)
+    return wrapper
+
+
+@app.context_processor
+def injetar_usuario_e_admin():
+    cfg = config_store.carregar()
+    entrada = _entrada_usuario_logado(cfg)
+    return {"usuario_e_admin": bool(entrada and entrada.get("is_admin"))}
+
+
 @app.route("/login", methods=["GET", "POST"])
 def login():
     cfg = config_store.carregar()
@@ -71,7 +97,7 @@ def login():
     primeira_vez = not cfg.get("usuarios")
 
     if time.time() < bloqueado_ate:
-        flash("Muitas tentativas erradas. Tente de novo em alguns minutos.")
+        flash("Muitas tentativas erradas. Tente de novo em alguns minutos.", "erro")
         return render_template("login.html", primeira_vez=primeira_vez)
 
     if request.method == "POST":
@@ -92,7 +118,7 @@ def login():
         bloqueio = time.time() + _BLOQUEIO_SEGUNDOS if contagem >= _MAX_TENTATIVAS else 0.0
         _tentativas_login[ip] = (contagem, bloqueio)
         access_log.registrar("login_falha", usuario=usuario, ip=ip)
-        flash("Usuário ou senha incorretos.")
+        flash("Usuário ou senha incorretos.", "erro")
 
     return render_template("login.html", primeira_vez=primeira_vez)
 
@@ -117,7 +143,7 @@ def definir_senha_inicial():
         problemas.append("as senhas não coincidem")
 
     if problemas:
-        flash("Não atende aos requisitos: " + ", ".join(problemas))
+        flash("Não atende aos requisitos: " + ", ".join(problemas), "erro")
         return redirect(url_for("login"))
 
     cfg["usuarios"] = [{
@@ -127,7 +153,7 @@ def definir_senha_inicial():
     }]
     config_store.salvar(cfg)
     access_log.registrar("usuario_criado", usuario=usuario, ip=_ip_do_cliente(), detalhes="primeiro usuário (admin)")
-    flash("Usuário e senha definidos com sucesso. Faça login.")
+    flash("Usuário e senha definidos com sucesso. Faça login.", "sucesso")
     return redirect(url_for("login"))
 
 
@@ -144,7 +170,7 @@ def dashboard():
         titulo = request.form.get("titulo", "").strip() or "Aviso da HOTNET"
         corpo = request.form.get("mensagem", "").strip()
         if not corpo:
-            flash("Digite uma mensagem.")
+            flash("Digite uma mensagem.", "erro")
         else:
             try:
                 enviar_aviso(titulo, corpo)
@@ -152,9 +178,9 @@ def dashboard():
                     "aviso_enviado", usuario=session.get("usuario", ""),
                     ip=_ip_do_cliente(), detalhes=titulo,
                 )
-                flash("Aviso enviado com sucesso!")
+                flash("Aviso enviado com sucesso!", "sucesso")
             except Exception as e:
-                flash(f"Erro ao enviar: {e}")
+                flash(f"Erro ao enviar: {e}", "erro")
 
     cfg = config_store.carregar()
     return render_template("dashboard.html", templates=cfg.get("templates", []))
@@ -173,7 +199,7 @@ def modelos():
             titulo = request.form.get("titulo", "").strip() or "Aviso da HOTNET"
             mensagem = request.form.get("mensagem", "").strip()
             if not nome or not mensagem:
-                flash("Preencha o nome do modelo e a mensagem.")
+                flash("Preencha o nome do modelo e a mensagem.", "erro")
             else:
                 cfg.setdefault("templates", []).append({
                     "id": uuid.uuid4().hex,
@@ -182,7 +208,7 @@ def modelos():
                     "mensagem": mensagem,
                 })
                 config_store.salvar(cfg)
-                flash("Modelo criado com sucesso.")
+                flash("Modelo criado com sucesso.", "sucesso")
 
         elif acao == "editar":
             template_id = request.form.get("id")
@@ -190,7 +216,7 @@ def modelos():
             titulo = request.form.get("titulo", "").strip() or "Aviso da HOTNET"
             mensagem = request.form.get("mensagem", "").strip()
             if not nome or not mensagem:
-                flash("Preencha o nome do modelo e a mensagem.")
+                flash("Preencha o nome do modelo e a mensagem.", "erro")
             else:
                 encontrado = False
                 for t in cfg.get("templates", []):
@@ -202,9 +228,9 @@ def modelos():
                         break
                 if encontrado:
                     config_store.salvar(cfg)
-                    flash("Modelo atualizado com sucesso.")
+                    flash("Modelo atualizado com sucesso.", "sucesso")
                 else:
-                    flash("Modelo não encontrado.")
+                    flash("Modelo não encontrado.", "erro")
 
         elif acao == "excluir":
             template_id = request.form.get("id")
@@ -212,7 +238,7 @@ def modelos():
             cfg["templates"] = [t for t in cfg.get("templates", []) if t.get("id") != template_id]
             if len(cfg["templates"]) < antes:
                 config_store.salvar(cfg)
-                flash("Modelo removido.")
+                flash("Modelo removido.", "sucesso")
 
         return redirect(url_for("modelos"))
 
@@ -227,39 +253,37 @@ def logs():
 
 @app.route("/configuracoes", methods=["GET", "POST"])
 @login_obrigatorio
+@admin_obrigatorio
 def configuracoes():
     cfg = config_store.carregar()
+    usuario_logado = session.get("usuario")
+    entrada_logada = _entrada_usuario_logado(cfg)
 
     if request.method == "POST":
         acao = request.form.get("acao")
-
-        usuario_logado = session.get("usuario")
-        entrada_logada = next(
-            (u for u in cfg.get("usuarios", []) if u["username"] == usuario_logado), None
-        )
 
         if acao == "senha":
             atual = request.form.get("senha_atual", "")
             nova = request.form.get("nova_senha", "")
             confirmacao = request.form.get("confirmacao", "")
             if not entrada_logada or not check_password_hash(entrada_logada["password_hash"], atual):
-                flash("Senha atual incorreta.")
+                flash("Senha atual incorreta.", "erro")
             else:
                 problemas = validar_forca_senha(nova)
                 if nova != confirmacao:
                     problemas.append("as senhas não coincidem")
                 if problemas:
-                    flash("Não atende aos requisitos: " + ", ".join(problemas))
+                    flash("Não atende aos requisitos: " + ", ".join(problemas), "erro")
                 else:
                     entrada_logada["password_hash"] = generate_password_hash(nova)
                     config_store.salvar(cfg)
                     access_log.registrar("senha_alterada", usuario=usuario_logado, ip=_ip_do_cliente())
-                    flash("Senha atualizada com sucesso.")
+                    flash("Senha atualizada com sucesso.", "sucesso")
 
         elif acao == "novo_usuario":
             senha_confirmacao = request.form.get("senha_atual_novo_usuario", "")
             if not entrada_logada or not check_password_hash(entrada_logada["password_hash"], senha_confirmacao):
-                flash("Sua senha atual está incorreta — confirmação necessária pra criar um novo usuário.")
+                flash("Sua senha atual está incorreta — confirmação necessária pra criar um novo usuário.", "erro")
             else:
                 novo_nome = request.form.get("novo_usuario_nome", "").strip()
                 nova_senha = request.form.get("novo_usuario_senha", "")
@@ -272,7 +296,7 @@ def configuracoes():
                 if nova_senha != nova_confirmacao:
                     problemas.append("as senhas não coincidem")
                 if problemas:
-                    flash("Não atende aos requisitos: " + ", ".join(problemas))
+                    flash("Não atende aos requisitos: " + ", ".join(problemas), "erro")
                 else:
                     cfg.setdefault("usuarios", []).append({
                         "username": novo_nome,
@@ -284,7 +308,7 @@ def configuracoes():
                         "usuario_criado", usuario=usuario_logado,
                         ip=_ip_do_cliente(), detalhes=novo_nome,
                     )
-                    flash(f"Usuário \"{novo_nome}\" criado com sucesso.")
+                    flash(f"Usuário \"{novo_nome}\" criado com sucesso.", "sucesso")
 
         elif acao == "remover_usuario":
             alvo = request.form.get("usuario_remover", "")
@@ -292,11 +316,11 @@ def configuracoes():
                 (u for u in cfg.get("usuarios", []) if u["username"] == alvo), None
             )
             if entrada_alvo and entrada_alvo.get("is_admin"):
-                flash("Não é possível remover o usuário administrador principal.")
+                flash("Não é possível remover o usuário administrador principal.", "erro")
             elif len(cfg.get("usuarios", [])) <= 1:
-                flash("Não é possível remover o único usuário existente.")
+                flash("Não é possível remover o único usuário existente.", "erro")
             elif alvo == usuario_logado:
-                flash("Você não pode remover seu próprio usuário enquanto estiver logado com ele.")
+                flash("Você não pode remover seu próprio usuário enquanto estiver logado com ele.", "erro")
             else:
                 antes = len(cfg.get("usuarios", []))
                 cfg["usuarios"] = [u for u in cfg.get("usuarios", []) if u["username"] != alvo]
@@ -306,7 +330,7 @@ def configuracoes():
                         "usuario_removido", usuario=usuario_logado,
                         ip=_ip_do_cliente(), detalhes=alvo,
                     )
-                    flash(f"Usuário \"{alvo}\" removido.")
+                    flash(f"Usuário \"{alvo}\" removido.", "sucesso")
 
         elif acao == "porta":
             try:
@@ -317,10 +341,11 @@ def configuracoes():
                 config_store.salvar(cfg)
                 flash(
                     f"Porta salva como {nova_porta}. Reinicie o serviço pra aplicar: "
-                    f"systemctl restart aviso-broadcaster"
+                    f"systemctl restart aviso-broadcaster",
+                    "sucesso",
                 )
             except ValueError:
-                flash("Porta inválida — use um número entre 1 e 65535.")
+                flash("Porta inválida — use um número entre 1 e 65535.", "erro")
 
         elif acao == "acl":
             bruto = request.form.get("allowed_ips", "")
@@ -332,11 +357,11 @@ def configuracoes():
                 except ValueError:
                     invalidos.append(ip)
             if invalidos:
-                flash("IPs/faixas inválidos: " + ", ".join(invalidos))
+                flash("IPs/faixas inválidos: " + ", ".join(invalidos), "erro")
             else:
                 cfg["allowed_ips"] = ips
                 config_store.salvar(cfg)
-                flash("Lista de IPs permitidos atualizada.")
+                flash("Lista de IPs permitidos atualizada.", "sucesso")
 
         return redirect(url_for("configuracoes"))
 

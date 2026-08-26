@@ -4,82 +4,193 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>{% block titulo %}Aviso Broadcaster{% endblock %}</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <style>
-        :root { color-scheme: light; }
+        :root {
+            color-scheme: light;
+            --cor-fundo: #F3F4F7;
+            --cor-superficie: #FFFFFF;
+            --cor-borda: #E7E8EE;
+            --cor-texto: #1D2129;
+            --cor-texto-secundario: #6B7280;
+            --cor-acento: #F28F3B;
+            --cor-acento-escuro: #D94A38;
+            --cor-sucesso: #1E8E5A;
+            --cor-sucesso-bg: #E9F7EF;
+            --cor-sucesso-borda: #BFE8D3;
+            --cor-erro: #C0362C;
+            --cor-erro-bg: #FCEBEA;
+            --cor-erro-borda: #F3C6C2;
+            --raio: 14px;
+            --raio-pequeno: 9px;
+            --sombra: 0 1px 2px rgba(20, 22, 30, 0.04), 0 8px 24px -12px rgba(20, 22, 30, 0.12);
+        }
         * { box-sizing: border-box; }
         body {
             margin: 0;
-            font-family: -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
-            background: #F5F5F5;
-            color: #333;
+            font-family: "Inter", -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+            background: var(--cor-fundo);
+            color: var(--cor-texto);
+            -webkit-font-smoothing: antialiased;
         }
         header {
-            background: linear-gradient(135deg, #D94A38, #F28F3B);
+            background: linear-gradient(135deg, var(--cor-acento-escuro), var(--cor-acento));
             color: #fff;
-            padding: 16px 24px;
+            padding: 18px 28px;
             display: flex;
             justify-content: space-between;
             align-items: center;
             flex-wrap: wrap;
-            gap: 8px;
+            gap: 12px;
+            box-shadow: 0 4px 16px -8px rgba(217, 74, 56, 0.5);
         }
-        header a { color: #fff; text-decoration: none; margin-left: 16px; font-size: 14px; }
-        header a:hover { text-decoration: underline; }
-        header h1 { margin: 0; font-size: 18px; }
-        main { max-width: 640px; margin: 32px auto; padding: 0 16px; }
+        .marca {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .marca-icone {
+            width: 34px;
+            height: 34px;
+            border-radius: 10px;
+            background: rgba(255, 255, 255, 0.18);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 17px;
+            flex-shrink: 0;
+        }
+        header h1 {
+            margin: 0;
+            font-size: 16px;
+            font-weight: 700;
+            letter-spacing: 0.2px;
+        }
+        header .subtitulo {
+            margin: 0;
+            font-size: 11px;
+            font-weight: 500;
+            color: rgba(255, 255, 255, 0.75);
+            text-transform: uppercase;
+            letter-spacing: 0.6px;
+        }
+        nav {
+            display: flex;
+            align-items: center;
+            gap: 2px;
+            background: rgba(0, 0, 0, 0.12);
+            padding: 4px;
+            border-radius: 999px;
+            flex-wrap: wrap;
+        }
+        nav a {
+            color: rgba(255, 255, 255, 0.85);
+            text-decoration: none;
+            font-size: 13px;
+            font-weight: 600;
+            padding: 7px 14px;
+            border-radius: 999px;
+            transition: background 0.15s ease, color 0.15s ease;
+            white-space: nowrap;
+        }
+        nav a:hover { background: rgba(255, 255, 255, 0.14); color: #fff; }
+        nav a.ativo { background: #fff; color: var(--cor-acento-escuro); }
+        main { max-width: 680px; margin: 40px auto; padding: 0 20px 40px; }
         .card {
-            background: #fff;
-            border-radius: 12px;
-            padding: 24px;
-            box-shadow: 0 1px 4px rgba(0,0,0,0.08);
-            margin-bottom: 20px;
+            background: var(--cor-superficie);
+            border: 1px solid var(--cor-borda);
+            border-radius: var(--raio);
+            padding: 26px;
+            box-shadow: var(--sombra);
+            margin-bottom: 22px;
         }
-        h2 { margin-top: 0; font-size: 17px; }
-        label { display: block; margin: 12px 0 4px; font-size: 13px; font-weight: bold; color: #555; }
+        h2 {
+            margin: 0 0 4px;
+            font-size: 16px;
+            font-weight: 700;
+            letter-spacing: -0.1px;
+        }
+        label {
+            display: block;
+            margin: 16px 0 6px;
+            font-size: 12.5px;
+            font-weight: 600;
+            color: var(--cor-texto-secundario);
+            text-transform: uppercase;
+            letter-spacing: 0.3px;
+        }
         input[type=text], input[type=password], input[type=number], textarea {
             width: 100%;
-            padding: 10px 12px;
-            border: 1px solid #E0E0E0;
-            border-radius: 8px;
+            padding: 11px 13px;
+            border: 1.5px solid var(--cor-borda);
+            border-radius: var(--raio-pequeno);
+            font-size: 14.5px;
+            font-family: inherit;
+            color: var(--cor-texto);
+            background: #FCFCFD;
+            transition: border-color 0.15s ease, box-shadow 0.15s ease;
+        }
+        input[type=text]:focus, input[type=password]:focus, input[type=number]:focus, textarea:focus {
+            outline: none;
+            border-color: var(--cor-acento);
+            box-shadow: 0 0 0 3px rgba(242, 143, 59, 0.18);
+            background: #fff;
+        }
+        textarea { min-height: 110px; resize: vertical; line-height: 1.5; }
+        button {
+            margin-top: 20px;
+            padding: 11px 22px;
+            border: none;
+            border-radius: var(--raio-pequeno);
+            background: var(--cor-acento);
+            color: #fff;
+            font-weight: 700;
             font-size: 14px;
             font-family: inherit;
-        }
-        textarea { min-height: 100px; resize: vertical; }
-        button {
-            margin-top: 16px;
-            padding: 10px 20px;
-            border: none;
-            border-radius: 8px;
-            background: #F28F3B;
-            color: #fff;
-            font-weight: bold;
-            font-size: 14px;
             cursor: pointer;
+            transition: background 0.15s ease, transform 0.1s ease, box-shadow 0.15s ease;
+            box-shadow: 0 2px 8px -2px rgba(242, 143, 59, 0.55);
         }
-        button:hover { background: #D94A38; }
+        button:hover { background: var(--cor-acento-escuro); transform: translateY(-1px); }
+        button:active { transform: translateY(0); }
         .flash {
-            padding: 12px 16px;
-            border-radius: 8px;
+            padding: 13px 16px;
+            border-radius: var(--raio-pequeno);
             margin-bottom: 16px;
-            font-size: 14px;
-            background: #FFF3E0;
-            color: #7A4B00;
-            border: 1px solid #FFD08A;
+            font-size: 13.5px;
+            font-weight: 500;
+            background: var(--cor-erro-bg);
+            color: var(--cor-erro);
+            border: 1px solid var(--cor-erro-borda);
         }
-        .aviso-acl { font-size: 12px; color: #999; margin-top: 4px; }
-        .dica { font-size: 13px; color: #777; }
-        .dica a { color: #D94A38; }
+        .flash-sucesso {
+            background: var(--cor-sucesso-bg);
+            color: var(--cor-sucesso);
+            border-color: var(--cor-sucesso-borda);
+        }
+        .aviso-acl { font-size: 12px; color: var(--cor-texto-secundario); margin-top: 6px; }
+        .dica { font-size: 13px; color: var(--cor-texto-secundario); line-height: 1.5; }
+        .dica a { color: var(--cor-acento-escuro); font-weight: 600; text-decoration: none; }
+        .dica a:hover { text-decoration: underline; }
         .badge-admin {
             display: inline-block;
-            background: #FFF3E0;
-            color: #D94A38;
-            font-size: 11px;
-            font-weight: bold;
-            padding: 2px 8px;
-            border-radius: 10px;
+            background: var(--cor-sucesso-bg);
+            color: var(--cor-sucesso);
+            font-size: 10.5px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.3px;
+            padding: 3px 9px;
+            border-radius: 999px;
             margin-left: 6px;
         }
-        .tabela-logs-scroll { overflow-x: auto; }
+        .tabela-logs-scroll {
+            overflow-x: auto;
+            border: 1px solid var(--cor-borda);
+            border-radius: var(--raio-pequeno);
+        }
         .tabela-logs {
             width: 100%;
             border-collapse: collapse;
@@ -87,56 +198,66 @@
         }
         .tabela-logs th, .tabela-logs td {
             text-align: left;
-            padding: 8px 10px;
-            border-bottom: 1px solid #EEE;
+            padding: 10px 14px;
+            border-bottom: 1px solid var(--cor-borda);
             white-space: nowrap;
         }
-        .tabela-logs td:last-child, .tabela-logs th:last-child {
-            white-space: normal;
-        }
+        .tabela-logs tbody tr:last-child td { border-bottom: none; }
+        .tabela-logs tbody tr:hover { background: #FAFAFB; }
+        .tabela-logs td:last-child, .tabela-logs th:last-child { white-space: normal; }
         .tabela-logs th {
-            color: #999;
-            font-size: 11px;
+            color: var(--cor-texto-secundario);
+            font-size: 10.5px;
+            font-weight: 700;
             text-transform: uppercase;
+            letter-spacing: 0.4px;
+            background: #FAFAFB;
         }
         .lista-modelos {
             display: flex;
             flex-direction: column;
-            gap: 6px;
-            margin-top: 6px;
+            gap: 4px;
+            margin-top: 8px;
         }
         .opcao-modelo {
             display: flex;
             align-items: center;
-            gap: 8px;
+            gap: 10px;
             font-size: 14px;
-            font-weight: normal;
-            color: #333;
+            font-weight: 500;
+            color: var(--cor-texto);
             margin: 0;
+            padding: 8px 10px;
+            border-radius: var(--raio-pequeno);
+            transition: background 0.12s ease;
         }
-        .opcao-modelo input { width: auto; }
+        .opcao-modelo:hover { background: #FAFAFB; }
+        .opcao-modelo input { width: auto; accent-color: var(--cor-acento); }
         .item-modelo {
             display: flex;
             justify-content: space-between;
             align-items: flex-start;
             gap: 12px;
-            padding: 12px 0;
-            border-top: 1px solid #EEE;
+            padding: 14px 0;
+            border-top: 1px solid var(--cor-borda);
         }
         .item-modelo:first-child { border-top: none; padding-top: 0; }
         .item-modelo p { margin: 4px 0 0; }
         .botao-remover {
-            background: #B71C1C;
+            background: var(--cor-erro);
             margin-top: 0;
             white-space: nowrap;
+            box-shadow: none;
         }
-        .botao-remover:hover { background: #8E1515; }
+        .botao-remover:hover { background: #9C2C24; }
         .botao-secundario {
-            background: #999;
+            background: #F0F1F4;
+            color: var(--cor-texto);
             margin-top: 0;
             white-space: nowrap;
+            box-shadow: none;
         }
-        .botao-secundario:hover { background: #777; }
+        .botao-secundario:hover { background: #E4E5EA; color: var(--cor-texto); transform: none; }
         .acoes-modelo {
             display: flex;
             gap: 8px;
@@ -146,38 +267,54 @@
         .lista-usuarios {
             list-style: none;
             padding: 0;
-            margin: 0 0 20px;
+            margin: 0 0 24px;
         }
         .lista-usuarios li {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            padding: 10px 0;
-            border-top: 1px solid #EEE;
+            padding: 12px 0;
+            border-top: 1px solid var(--cor-borda);
             font-size: 14px;
         }
         .lista-usuarios li:first-child { border-top: none; padding-top: 0; }
         .lista-usuarios form { margin: 0; }
+        .pagina-login main {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: calc(100vh - 74px);
+            margin: 0 auto;
+        }
+        .pagina-login .card { width: 100%; max-width: 380px; }
     </style>
 </head>
-<body>
+<body{% if request.endpoint == 'login' %} class="pagina-login"{% endif %}>
     <header>
-        <h1>Aviso Broadcaster — HOTNET</h1>
+        <div class="marca">
+            <div class="marca-icone">📣</div>
+            <div>
+                <h1>Aviso Broadcaster</h1>
+                <p class="subtitulo">HOTNET</p>
+            </div>
+        </div>
         {% if session.get('autenticado') %}
         <nav>
-            <a href="{{ url_for('dashboard') }}">Enviar aviso</a>
-            <a href="{{ url_for('modelos') }}">Modelos</a>
-            <a href="{{ url_for('logs') }}">Logs</a>
-            <a href="{{ url_for('configuracoes') }}">Configurações</a>
+            <a href="{{ url_for('dashboard') }}" class="{{ 'ativo' if request.endpoint == 'dashboard' }}">Enviar aviso</a>
+            <a href="{{ url_for('modelos') }}" class="{{ 'ativo' if request.endpoint == 'modelos' }}">Modelos</a>
+            <a href="{{ url_for('logs') }}" class="{{ 'ativo' if request.endpoint == 'logs' }}">Logs</a>
+            {% if usuario_e_admin %}
+            <a href="{{ url_for('configuracoes') }}" class="{{ 'ativo' if request.endpoint == 'configuracoes' }}">Configurações</a>
+            {% endif %}
             <a href="{{ url_for('logout') }}">Sair</a>
         </nav>
         {% endif %}
     </header>
     <main>
-        {% with mensagens = get_flashed_messages() %}
+        {% with mensagens = get_flashed_messages(with_categories=true) %}
             {% if mensagens %}
-                {% for m in mensagens %}
-                    <div class="flash">{{ m }}</div>
+                {% for categoria, m in mensagens %}
+                    <div class="flash{% if categoria == 'sucesso' %} flash-sucesso{% endif %}">{{ m }}</div>
                 {% endfor %}
             {% endif %}
         {% endwith %}
