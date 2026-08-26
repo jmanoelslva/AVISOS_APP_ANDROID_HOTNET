@@ -2,79 +2,69 @@
 {% block titulo %}Configurações{% endblock %}
 {% block conteudo %}
 
-<div class="card">
-    <h2>Alterar minha senha</h2>
-    <p class="dica">Logado como: <strong>{{ usuario_atual }}</strong></p>
-    <form method="post">
-        <input type="hidden" name="acao" value="senha">
-        <label>Senha atual</label>
-        <input type="password" name="senha_atual" required>
-        <label>Nova senha</label>
-        <input type="password" name="nova_senha" required minlength="8">
-        <label>Confirmar nova senha</label>
-        <input type="password" name="confirmacao" required minlength="8">
-        <p class="dica">Mínimo 8 caracteres, com maiúscula, minúscula, número e caractere especial.</p>
-        <button type="submit">Salvar senha</button>
-    </form>
-</div>
+<div class="grid-2col">
+    <div class="coluna-grid">
+        <div class="card">
+            <h2>Usuários do painel</h2>
+            <ul class="lista-usuarios">
+                {% for u in usuarios %}
+                <li>
+                    <span>
+                        {{ u.username }}
+                        {% if u.username == usuario_atual %}<span class="dica">(você)</span>{% endif %}
+                        {% if u.is_admin %}<span class="badge-admin">admin</span>{% endif %}
+                    </span>
+                    {% if not u.is_admin and u.username != usuario_atual and usuarios|length > 1 %}
+                    <form method="post" onsubmit="return confirm('Remover o usuário {{ u.username }}?')">
+                        <input type="hidden" name="acao" value="remover_usuario">
+                        <input type="hidden" name="usuario_remover" value="{{ u.username }}">
+                        <button type="submit" class="botao-remover">Remover</button>
+                    </form>
+                    {% endif %}
+                </li>
+                {% endfor %}
+            </ul>
 
-<div class="card">
-    <h2>Usuários do painel</h2>
-    <ul class="lista-usuarios">
-        {% for u in usuarios %}
-        <li>
-            <span>
-                {{ u.username }}
-                {% if u.username == usuario_atual %}<span class="dica">(você)</span>{% endif %}
-                {% if u.is_admin %}<span class="badge-admin">admin</span>{% endif %}
-            </span>
-            {% if not u.is_admin and u.username != usuario_atual and usuarios|length > 1 %}
-            <form method="post" onsubmit="return confirm('Remover o usuário {{ u.username }}?')">
-                <input type="hidden" name="acao" value="remover_usuario">
-                <input type="hidden" name="usuario_remover" value="{{ u.username }}">
-                <button type="submit" class="botao-remover">Remover</button>
+            <h2>Adicionar novo usuário</h2>
+            <form method="post">
+                <input type="hidden" name="acao" value="novo_usuario">
+                <label>Sua senha atual (confirmação de segurança)</label>
+                <input type="password" name="senha_atual_novo_usuario" required>
+                <label>Nome do novo usuário</label>
+                <input type="text" name="novo_usuario_nome" required maxlength="60">
+                <label>Senha do novo usuário</label>
+                <input type="password" name="novo_usuario_senha" required minlength="8">
+                <label>Confirmar senha</label>
+                <input type="password" name="novo_usuario_confirmacao" required minlength="8">
+                <p class="dica">Mínimo 8 caracteres, com maiúscula, minúscula, número e caractere especial.</p>
+                <button type="submit">Criar usuário</button>
             </form>
-            {% endif %}
-        </li>
-        {% endfor %}
-    </ul>
+        </div>
+    </div>
 
-    <h2>Adicionar novo usuário</h2>
-    <form method="post">
-        <input type="hidden" name="acao" value="novo_usuario">
-        <label>Sua senha atual (confirmação de segurança)</label>
-        <input type="password" name="senha_atual_novo_usuario" required>
-        <label>Nome do novo usuário</label>
-        <input type="text" name="novo_usuario_nome" required maxlength="60">
-        <label>Senha do novo usuário</label>
-        <input type="password" name="novo_usuario_senha" required minlength="8">
-        <label>Confirmar senha</label>
-        <input type="password" name="novo_usuario_confirmacao" required minlength="8">
-        <p class="dica">Mínimo 8 caracteres, com maiúscula, minúscula, número e caractere especial.</p>
-        <button type="submit">Criar usuário</button>
-    </form>
-</div>
+    <div class="coluna-grid">
+        <div class="card">
+            <h2>Porta do servidor</h2>
+            <form method="post">
+                <input type="hidden" name="acao" value="porta">
+                <label>Porta atual: {{ porta_atual }}</label>
+                <input type="number" name="porta" min="1" max="65535" value="{{ porta_atual }}" required>
+                <p class="dica">Alterar a porta exige reiniciar o serviço pra valer: <code>systemctl restart aviso-broadcaster</code></p>
+                <button type="submit">Salvar porta</button>
+            </form>
+        </div>
 
-<div class="card">
-    <h2>Porta do servidor</h2>
-    <form method="post">
-        <input type="hidden" name="acao" value="porta">
-        <label>Porta atual: {{ porta_atual }}</label>
-        <input type="number" name="porta" min="1" max="65535" value="{{ porta_atual }}" required>
-        <p class="dica">Alterar a porta exige reiniciar o serviço pra valer: <code>systemctl restart aviso-broadcaster</code></p>
-        <button type="submit">Salvar porta</button>
-    </form>
-</div>
-
-<div class="card">
-    <h2>IPs permitidos (ACL)</h2>
-    <form method="post">
-        <input type="hidden" name="acao" value="acl">
-        <label>Um IP ou faixa CIDR por linha (ex: 203.0.113.10 ou 203.0.113.0/24)</label>
-        <textarea name="allowed_ips" placeholder="Deixe vazio pra permitir qualquer IP (não recomendado)">{{ allowed_ips }}</textarea>
-        <p class="aviso-acl">Vazio = sem restrição de IP. Recomendado sempre configurar pelo menos o seu IP fixo ou a faixa da sua rede.</p>
-        <button type="submit">Salvar lista de IPs</button>
-    </form>
+        <div class="card">
+            <h2>IPs permitidos (ACL)</h2>
+            <form method="post">
+                <input type="hidden" name="acao" value="acl">
+                <label>Um IP ou faixa CIDR por linha (ex: 203.0.113.10 ou 203.0.113.0/24)</label>
+                <textarea name="allowed_ips" placeholder="Deixe vazio pra permitir qualquer IP (não recomendado)">{{ allowed_ips }}</textarea>
+                <p class="aviso-acl">Vazio = sem restrição de IP. Recomendado sempre configurar pelo menos o seu IP fixo ou a faixa da sua rede.</p>
+                <button type="submit">Salvar lista de IPs</button>
+            </form>
+        </div>
+    </div>
 </div>
 
 {% endblock %}

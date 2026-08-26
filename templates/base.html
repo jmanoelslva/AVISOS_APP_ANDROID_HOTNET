@@ -287,9 +287,21 @@
             margin: 0 auto;
         }
         .pagina-login .card { width: 100%; max-width: 380px; }
+        .pagina-larga main { max-width: 940px; }
+        .grid-2col {
+            display: grid;
+            grid-template-columns: 1.3fr 1fr;
+            gap: 22px;
+            align-items: start;
+        }
+        .coluna-grid { display: flex; flex-direction: column; gap: 22px; }
+        .coluna-grid .card { margin-bottom: 0; }
+        @media (max-width: 760px) {
+            .grid-2col { grid-template-columns: 1fr; }
+        }
     </style>
 </head>
-<body{% if request.endpoint == 'login' %} class="pagina-login"{% endif %}>
+<body{% if request.endpoint == 'login' %} class="pagina-login"{% elif request.endpoint == 'configuracoes' %} class="pagina-larga"{% endif %}>
     <header>
         <div class="marca">
             <div class="marca-icone">📣</div>
@@ -306,6 +318,7 @@
             {% if usuario_e_admin %}
             <a href="{{ url_for('configuracoes') }}" class="{{ 'ativo' if request.endpoint == 'configuracoes' }}">Configurações</a>
             {% endif %}
+            <a href="{{ url_for('minha_senha') }}" class="{{ 'ativo' if request.endpoint == 'minha_senha' }}">Minha senha</a>
             <a href="{{ url_for('logout') }}">Sair</a>
         </nav>
         {% endif %}

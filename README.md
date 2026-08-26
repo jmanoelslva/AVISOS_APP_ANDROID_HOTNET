@@ -87,12 +87,12 @@ diretamente na tela de login.
    Configurações (pede sua própria senha atual como confirmação). Não
    dá pra remover a si mesmo nem o último usuário restante, pra evitar
    ficar todo mundo trancado pra fora. **A página de Configurações
-   (porta, IPs, usuários, trocar senha) só fica visível e acessível
-   pra quem é o usuário administrador** (o primeiro criado, marcado
-   como "admin" na lista) — os demais usuários só veem as abas
-   "Enviar aviso", "Modelos" e "Logs", e não têm como trocar a própria
-   senha sozinhos (precisam pedir pro admin remover e recriar o
-   usuário, por enquanto).
+   (porta, IPs, gerenciar usuários) só fica visível e acessível pra
+   quem é o usuário administrador** (o primeiro criado, marcado como
+   "admin" na lista) — os demais usuários só veem as abas "Enviar
+   aviso", "Modelos", "Logs" e "Minha senha".
+6. Qualquer usuário (admin ou não) troca a própria senha em
+   "Minha senha", sem precisar de acesso a Configurações.
 
 ## 4. Importante — use HTTPS na frente
 

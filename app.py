@@ -251,6 +251,35 @@ def logs():
     return render_template("logs.html", eventos=access_log.listar())
 
 
+@app.route("/minha-senha", methods=["GET", "POST"])
+@login_obrigatorio
+def minha_senha():
+    cfg = config_store.carregar()
+    usuario_logado = session.get("usuario")
+    entrada_logada = _entrada_usuario_logado(cfg)
+
+    if request.method == "POST":
+        atual = request.form.get("senha_atual", "")
+        nova = request.form.get("nova_senha", "")
+        confirmacao = request.form.get("confirmacao", "")
+        if not entrada_logada or not check_password_hash(entrada_logada["password_hash"], atual):
+            flash("Senha atual incorreta.", "erro")
+        else:
+            problemas = validar_forca_senha(nova)
+            if nova != confirmacao:
+                problemas.append("as senhas não coincidem")
+            if problemas:
+                flash("Não atende aos requisitos: " + ", ".join(problemas), "erro")
+            else:
+                entrada_logada["password_hash"] = generate_password_hash(nova)
+                config_store.salvar(cfg)
+                access_log.registrar("senha_alterada", usuario=usuario_logado, ip=_ip_do_cliente())
+                flash("Senha atualizada com sucesso.", "sucesso")
+        return redirect(url_for("minha_senha"))
+
+    return render_template("minha_senha.html", usuario_atual=usuario_logado)
+
+
 @app.route("/configuracoes", methods=["GET", "POST"])
 @login_obrigatorio
 @admin_obrigatorio
@@ -262,25 +291,7 @@ def configuracoes():
     if request.method == "POST":
         acao = request.form.get("acao")
 
-        if acao == "senha":
-            atual = request.form.get("senha_atual", "")
-            nova = request.form.get("nova_senha", "")
-            confirmacao = request.form.get("confirmacao", "")
-            if not entrada_logada or not check_password_hash(entrada_logada["password_hash"], atual):
-                flash("Senha atual incorreta.", "erro")
-            else:
-                problemas = validar_forca_senha(nova)
-                if nova != confirmacao:
-                    problemas.append("as senhas não coincidem")
-                if problemas:
-                    flash("Não atende aos requisitos: " + ", ".join(problemas), "erro")
-                else:
-                    entrada_logada["password_hash"] = generate_password_hash(nova)
-                    config_store.salvar(cfg)
-                    access_log.registrar("senha_alterada", usuario=usuario_logado, ip=_ip_do_cliente())
-                    flash("Senha atualizada com sucesso.", "sucesso")
-
-        elif acao == "novo_usuario":
+        if acao == "novo_usuario":
             senha_confirmacao = request.form.get("senha_atual_novo_usuario", "")
             if not entrada_logada or not check_password_hash(entrada_logada["password_hash"], senha_confirmacao):
                 flash("Sua senha atual está incorreta — confirmação necessária pra criar um novo usuário.", "erro")
