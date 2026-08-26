@@ -2,17 +2,28 @@
 {% block titulo %}Configurações{% endblock %}
 {% block conteudo %}
 
+<div class="cabecalho-pagina">
+    <h1>Configurações</h1>
+    <p class="dica">Gerencie quem tem acesso ao painel, a porta do serviço e quais IPs podem entrar.</p>
+</div>
+
 <div class="grid-2col">
     <div class="coluna-grid">
         <div class="card">
-            <h2>Usuários do painel</h2>
+            <div class="titulo-card">
+                <span class="icone-card">👥</span>
+                <h2>Usuários do painel</h2>
+            </div>
             <ul class="lista-usuarios">
                 {% for u in usuarios %}
                 <li>
-                    <span>
-                        {{ u.username }}
-                        {% if u.username == usuario_atual %}<span class="dica">(você)</span>{% endif %}
-                        {% if u.is_admin %}<span class="badge-admin">admin</span>{% endif %}
+                    <span class="usuario-item">
+                        <span class="avatar-usuario">{{ u.username[0]|upper }}</span>
+                        <span>
+                            {{ u.username }}
+                            {% if u.username == usuario_atual %}<span class="dica">(você)</span>{% endif %}
+                            {% if u.is_admin %}<span class="badge-admin">admin</span>{% endif %}
+                        </span>
                     </span>
                     {% if not u.is_admin and u.username != usuario_atual and usuarios|length > 1 %}
                     <form method="post" onsubmit="return confirm('Remover o usuário {{ u.username }}?')">
@@ -27,7 +38,10 @@
         </div>
 
         <div class="card">
-            <h2>Adicionar novo usuário</h2>
+            <div class="titulo-card">
+                <span class="icone-card">➕</span>
+                <h2>Adicionar novo usuário</h2>
+            </div>
             <form method="post">
                 <input type="hidden" name="acao" value="novo_usuario">
                 <label>Sua senha atual (confirmação de segurança)</label>
@@ -46,7 +60,12 @@
 
     <div class="coluna-grid">
         <div class="card">
-            <h2>Porta do servidor</h2>
+            <div class="titulo-card">
+                <span class="icone-card">🌐</span>
+                <h2>Rede e acesso</h2>
+            </div>
+
+            <h3>Porta do servidor</h3>
             <form method="post">
                 <input type="hidden" name="acao" value="porta">
                 <label>Porta atual: {{ porta_atual }}</label>
@@ -54,10 +73,10 @@
                 <p class="dica">Alterar a porta exige reiniciar o serviço pra valer: <code>systemctl restart aviso-broadcaster</code></p>
                 <button type="submit">Salvar porta</button>
             </form>
-        </div>
 
-        <div class="card">
-            <h2>IPs permitidos (ACL)</h2>
+            <hr class="divisor">
+
+            <h3>IPs permitidos (ACL)</h3>
             <form method="post">
                 <input type="hidden" name="acao" value="acl">
                 <label>Um IP ou faixa CIDR por linha — aceita IPv4 e IPv6 (ex: 203.0.113.10, 203.0.113.0/24, 2001:db8::1 ou 2001:db8::/32)</label>
