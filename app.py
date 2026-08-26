@@ -49,7 +49,14 @@ def checar_acl():
 def login_obrigatorio(f):
     @wraps(f)
     def wrapper(*args, **kwargs):
-        if not session.get("autenticado"):
+        # Exige também "usuario" na sessão, não só "autenticado" — sessões
+        # antigas (de antes do suporte a múltiplos usuários) tinham
+        # autenticado=True mas nunca guardaram o nome de usuário, o que
+        # travava silenciosamente qualquer ação que precisasse saber quem
+        # está logado (ex: trocar senha, criar novo usuário). Nesse caso,
+        # força um login novo em vez de deixar a sessão incompleta.
+        if not session.get("autenticado") or not session.get("usuario"):
+            session.clear()
             return redirect(url_for("login"))
         return f(*args, **kwargs)
     return wrapper
