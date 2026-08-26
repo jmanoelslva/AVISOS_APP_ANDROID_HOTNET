@@ -105,6 +105,10 @@ Depois de logado, a tela inicial já é o formulário de envio: título
 enviar, todo cliente com o app instalado e conectado à internet recebe
 a notificação em poucos segundos.
 
+A aba **"Logs"** mostra o histórico de login (sucesso/falha), avisos
+enviados e alterações de usuário — os últimos 500 eventos, guardados
+localmente em `acessos.log` (não versionado no git).
+
 ## 6. Atualizando uma instalação já existente
 
 Se você já rodou o `install.sh` antes (e o serviço já está no ar), **não

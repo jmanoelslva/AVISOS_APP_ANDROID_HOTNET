@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+{% block titulo %}Log de acessos{% endblock %}
+{% block conteudo %}
+
+<div class="card">
+    <h2>Log de acessos e ações</h2>
+    <p class="dica">
+        Registra login (sucesso e falha), envio de avisos e alterações de
+        usuários — mais recentes primeiro. Mantém só os últimos 500
+        eventos.
+    </p>
+
+    {% if eventos %}
+    <div class="tabela-logs-scroll">
+        <table class="tabela-logs">
+            <thead>
+                <tr>
+                    <th>Quando</th>
+                    <th>Evento</th>
+                    <th>Usuário</th>
+                    <th>IP</th>
+                    <th>Detalhes</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for e in eventos %}
+                <tr>
+                    <td>{{ e.quando }}</td>
+                    <td>
+                        {% if e.evento == 'login_sucesso' %}Login (sucesso)
+                        {% elif e.evento == 'login_falha' %}Login (falha)
+                        {% elif e.evento == 'aviso_enviado' %}Aviso enviado
+                        {% elif e.evento == 'usuario_criado' %}Usuário criado
+                        {% elif e.evento == 'usuario_removido' %}Usuário removido
+                        {% elif e.evento == 'senha_alterada' %}Senha alterada
+                        {% else %}{{ e.evento }}
+                        {% endif %}
+                    </td>
+                    <td>{{ e.usuario }}</td>
+                    <td>{{ e.ip }}</td>
+                    <td>{{ e.detalhes }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <p class="dica">Nenhum evento registrado ainda.</p>
+    {% endif %}
+</div>
+
+{% endblock %}

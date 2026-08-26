@@ -6,6 +6,7 @@ from functools import wraps
 from flask import Flask, abort, flash, redirect, render_template, request, session, url_for
 from werkzeug.security import check_password_hash, generate_password_hash
 
+import access_log
 import config_store
 from fcm_sender import enviar_aviso
 from security import validar_forca_senha
@@ -83,12 +84,14 @@ def login():
             session["autenticado"] = True
             session["usuario"] = usuario
             _tentativas_login.pop(ip, None)
+            access_log.registrar("login_sucesso", usuario=usuario, ip=ip)
             return redirect(url_for("dashboard"))
 
         contagem, _ = _tentativas_login.get(ip, (0, 0.0))
         contagem += 1
         bloqueio = time.time() + _BLOQUEIO_SEGUNDOS if contagem >= _MAX_TENTATIVAS else 0.0
         _tentativas_login[ip] = (contagem, bloqueio)
+        access_log.registrar("login_falha", usuario=usuario, ip=ip)
         flash("Usuário ou senha incorretos.")
 
     return render_template("login.html", primeira_vez=primeira_vez)
@@ -117,8 +120,13 @@ def definir_senha_inicial():
         flash("Não atende aos requisitos: " + ", ".join(problemas))
         return redirect(url_for("login"))
 
-    cfg["usuarios"] = [{"username": usuario, "password_hash": generate_password_hash(senha)}]
+    cfg["usuarios"] = [{
+        "username": usuario,
+        "password_hash": generate_password_hash(senha),
+        "is_admin": True,
+    }]
     config_store.salvar(cfg)
+    access_log.registrar("usuario_criado", usuario=usuario, ip=_ip_do_cliente(), detalhes="primeiro usuário (admin)")
     flash("Usuário e senha definidos com sucesso. Faça login.")
     return redirect(url_for("login"))
 
@@ -140,6 +148,10 @@ def dashboard():
         else:
             try:
                 enviar_aviso(titulo, corpo)
+                access_log.registrar(
+                    "aviso_enviado", usuario=session.get("usuario", ""),
+                    ip=_ip_do_cliente(), detalhes=titulo,
+                )
                 flash("Aviso enviado com sucesso!")
             except Exception as e:
                 flash(f"Erro ao enviar: {e}")
@@ -207,6 +219,12 @@ def modelos():
     return render_template("modelos.html", templates=cfg.get("templates", []))
 
 
+@app.route("/logs")
+@login_obrigatorio
+def logs():
+    return render_template("logs.html", eventos=access_log.listar())
+
+
 @app.route("/configuracoes", methods=["GET", "POST"])
 @login_obrigatorio
 def configuracoes():
@@ -235,6 +253,7 @@ def configuracoes():
                 else:
                     entrada_logada["password_hash"] = generate_password_hash(nova)
                     config_store.salvar(cfg)
+                    access_log.registrar("senha_alterada", usuario=usuario_logado, ip=_ip_do_cliente())
                     flash("Senha atualizada com sucesso.")
 
         elif acao == "novo_usuario":
@@ -258,13 +277,23 @@ def configuracoes():
                     cfg.setdefault("usuarios", []).append({
                         "username": novo_nome,
                         "password_hash": generate_password_hash(nova_senha),
+                        "is_admin": False,
                     })
                     config_store.salvar(cfg)
+                    access_log.registrar(
+                        "usuario_criado", usuario=usuario_logado,
+                        ip=_ip_do_cliente(), detalhes=novo_nome,
+                    )
                     flash(f"Usuário \"{novo_nome}\" criado com sucesso.")
 
         elif acao == "remover_usuario":
             alvo = request.form.get("usuario_remover", "")
-            if len(cfg.get("usuarios", [])) <= 1:
+            entrada_alvo = next(
+                (u for u in cfg.get("usuarios", []) if u["username"] == alvo), None
+            )
+            if entrada_alvo and entrada_alvo.get("is_admin"):
+                flash("Não é possível remover o usuário administrador principal.")
+            elif len(cfg.get("usuarios", [])) <= 1:
                 flash("Não é possível remover o único usuário existente.")
             elif alvo == usuario_logado:
                 flash("Você não pode remover seu próprio usuário enquanto estiver logado com ele.")
@@ -273,6 +302,10 @@ def configuracoes():
                 cfg["usuarios"] = [u for u in cfg.get("usuarios", []) if u["username"] != alvo]
                 if len(cfg["usuarios"]) < antes:
                     config_store.salvar(cfg)
+                    access_log.registrar(
+                        "usuario_removido", usuario=usuario_logado,
+                        ip=_ip_do_cliente(), detalhes=alvo,
+                    )
                     flash(f"Usuário \"{alvo}\" removido.")
 
         elif acao == "porta":

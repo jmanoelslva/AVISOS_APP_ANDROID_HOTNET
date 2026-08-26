@@ -23,8 +23,12 @@
     <ul class="lista-usuarios">
         {% for u in usuarios %}
         <li>
-            <span>{{ u.username }}{% if u.username == usuario_atual %} <span class="dica">(você)</span>{% endif %}</span>
-            {% if u.username != usuario_atual and usuarios|length > 1 %}
+            <span>
+                {{ u.username }}
+                {% if u.username == usuario_atual %}<span class="dica">(você)</span>{% endif %}
+                {% if u.is_admin %}<span class="badge-admin">admin</span>{% endif %}
+            </span>
+            {% if not u.is_admin and u.username != usuario_atual and usuarios|length > 1 %}
             <form method="post" onsubmit="return confirm('Remover o usuário {{ u.username }}?')">
                 <input type="hidden" name="acao" value="remover_usuario">
                 <input type="hidden" name="usuario_remover" value="{{ u.username }}">

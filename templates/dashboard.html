@@ -13,14 +13,14 @@
     <label>Modelo pronto (opcional)</label>
     <div class="lista-modelos">
         <label class="opcao-modelo">
-            <input type="radio" name="modelo_radio" value="" checked
-                   onchange="preencherModelo('', '')">
+            <input type="radio" name="modelo_radio" class="radio-modelo" value=""
+                   data-titulo="" data-mensagem="" checked>
             Escrever mensagem própria
         </label>
         {% for t in templates %}
         <label class="opcao-modelo">
-            <input type="radio" name="modelo_radio" value="{{ t.id }}"
-                   onchange="preencherModelo({{ t.titulo|tojson }}, {{ t.mensagem|tojson }})">
+            <input type="radio" name="modelo_radio" class="radio-modelo" value="{{ t.id }}"
+                   data-titulo="{{ t.titulo }}" data-mensagem="{{ t.mensagem }}">
             {{ t.nome }}
         </label>
         {% endfor %}
@@ -56,10 +56,12 @@
 </div>
 
 <script>
-    function preencherModelo(titulo, mensagem) {
-        document.getElementById('campoTitulo').value = titulo;
-        document.getElementById('campoMensagem').value = mensagem;
-    }
+    document.querySelectorAll('.radio-modelo').forEach(function (radio) {
+        radio.addEventListener('change', function () {
+            document.getElementById('campoTitulo').value = this.dataset.titulo || '';
+            document.getElementById('campoMensagem').value = this.dataset.mensagem || '';
+        });
+    });
 
     function confirmarEnvio() {
         const mensagem = document.getElementById('campoMensagem').value;

@@ -32,8 +32,9 @@
                 <p class="dica">{{ t.mensagem }}</p>
             </div>
             <div class="acoes-modelo">
-                <button type="button" class="botao-secundario"
-                        onclick="editarModelo({{ t.id|tojson }}, {{ t.nome|tojson }}, {{ t.titulo|tojson }}, {{ t.mensagem|tojson }})">
+                <button type="button" class="botao-secundario editar-modelo-btn"
+                        data-id="{{ t.id }}" data-nome="{{ t.nome }}"
+                        data-titulo="{{ t.titulo }}" data-mensagem="{{ t.mensagem }}">
                     Editar
                 </button>
                 <form method="post" onsubmit="return confirm('Remover este modelo?')">
@@ -50,6 +51,12 @@
 </div>
 
 <script>
+    document.querySelectorAll('.editar-modelo-btn').forEach(function (botao) {
+        botao.addEventListener('click', function () {
+            editarModelo(this.dataset.id, this.dataset.nome, this.dataset.titulo, this.dataset.mensagem);
+        });
+    });
+
     function editarModelo(id, nome, titulo, mensagem) {
         document.getElementById('campoAcao').value = 'editar';
         document.getElementById('campoId').value = id;

@@ -114,6 +114,8 @@ def carregar() -> dict:
         # Migra o usuário único (versões anteriores, com "username" e
         # "password_hash" soltos) pra dentro da lista "usuarios" — feito
         # uma vez só, já que depois disso as chaves antigas são removidas.
+        # Esse usuário migrado vira o admin protegido (não pode ser
+        # removido por ninguém).
         if "username" in _config_cache or "password_hash" in _config_cache:
             usuario_antigo = _config_cache.get("username")
             hash_antigo = _config_cache.get("password_hash")
@@ -125,9 +127,18 @@ def carregar() -> dict:
                     _config_cache.setdefault("usuarios", []).append({
                         "username": usuario_antigo,
                         "password_hash": hash_antigo,
+                        "is_admin": True,
                     })
             _config_cache.pop("username", None)
             _config_cache.pop("password_hash", None)
+            alterou = True
+        # Garante que exista sempre exatamente um admin protegido — se a
+        # lista de usuários já existe (de uma versão anterior ao campo
+        # is_admin) e nenhum está marcado, o primeiro da lista vira o
+        # admin protegido.
+        usuarios = _config_cache.get("usuarios", [])
+        if usuarios and not any(u.get("is_admin") for u in usuarios):
+            usuarios[0]["is_admin"] = True
             alterou = True
         if alterou:
             salvar(_config_cache)

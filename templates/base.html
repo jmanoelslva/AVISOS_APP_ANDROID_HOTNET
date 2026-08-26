@@ -69,6 +69,36 @@
         .aviso-acl { font-size: 12px; color: #999; margin-top: 4px; }
         .dica { font-size: 13px; color: #777; }
         .dica a { color: #D94A38; }
+        .badge-admin {
+            display: inline-block;
+            background: #FFF3E0;
+            color: #D94A38;
+            font-size: 11px;
+            font-weight: bold;
+            padding: 2px 8px;
+            border-radius: 10px;
+            margin-left: 6px;
+        }
+        .tabela-logs-scroll { overflow-x: auto; }
+        .tabela-logs {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 13px;
+        }
+        .tabela-logs th, .tabela-logs td {
+            text-align: left;
+            padding: 8px 10px;
+            border-bottom: 1px solid #EEE;
+            white-space: nowrap;
+        }
+        .tabela-logs td:last-child, .tabela-logs th:last-child {
+            white-space: normal;
+        }
+        .tabela-logs th {
+            color: #999;
+            font-size: 11px;
+            text-transform: uppercase;
+        }
         .lista-modelos {
             display: flex;
             flex-direction: column;
@@ -137,6 +167,7 @@
         <nav>
             <a href="{{ url_for('dashboard') }}">Enviar aviso</a>
             <a href="{{ url_for('modelos') }}">Modelos</a>
+            <a href="{{ url_for('logs') }}">Logs</a>
             <a href="{{ url_for('configuracoes') }}">Configurações</a>
             <a href="{{ url_for('logout') }}">Sair</a>
         </nav>
