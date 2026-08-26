@@ -6,7 +6,11 @@ import config_store
 
 _cfg = config_store.carregar()
 
-bind = f"0.0.0.0:{_cfg.get('port', config_store.DEFAULT_PORT)}"
+# "[::]" (IPv6 wildcard) já aceita conexões IPv4 também, no Linux com o
+# padrão net.ipv6.bindv6only=0 (caso do Debian) — é uma única escuta
+# dual-stack. Tentar escutar em "0.0.0.0" E "[::]" ao mesmo tempo dá erro
+# de "endereço já em uso", por isso é só esse.
+bind = f"[::]:{_cfg.get('port', config_store.DEFAULT_PORT)}"
 
 # Só 1 worker de propósito: o bloqueio por tentativas de login errado
 # (_tentativas_login, em app.py) é guardado em memória do processo — com

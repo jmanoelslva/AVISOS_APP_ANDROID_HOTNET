@@ -301,7 +301,7 @@
         }
     </style>
 </head>
-<body{% if request.endpoint == 'login' %} class="pagina-login"{% elif request.endpoint == 'configuracoes' %} class="pagina-larga"{% endif %}>
+<body{% if request.endpoint == 'login' %} class="pagina-login"{% elif request.endpoint in ('configuracoes', 'logs') %} class="pagina-larga"{% endif %}>
     <header>
         <div class="marca">
             <div class="marca-icone">📣</div>

@@ -79,7 +79,9 @@ diretamente na tela de login.
    pela tela de primeiro acesso).
 3. Vá em **Configurações** e cadastre pelo menos o seu próprio IP (ou
    a faixa da sua rede/VPN) na lista de IPs permitidos — por padrão,
-   sem essa lista, qualquer IP consegue acessar a tela de login.
+   sem essa lista, qualquer IP consegue acessar a tela de login. Aceita
+   IPv4 e IPv6 (o Gunicorn escuta em `[::]`, que no Debian já responde
+   pelos dois automaticamente — não precisa configurar nada a mais).
 4. Se quiser mudar a porta depois, salve o novo valor em Configurações
    e rode `systemctl restart aviso-broadcaster` (a porta só é lida na
    inicialização do processo).

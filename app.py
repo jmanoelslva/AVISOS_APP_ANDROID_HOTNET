@@ -26,9 +26,19 @@ def _ip_do_cliente() -> str:
     # Se estiver atrás de um proxy reverso (Nginx), confia no
     # X-Forwarded-For; senão usa o IP direto da conexão.
     encaminhado = request.headers.get("X-Forwarded-For")
-    if encaminhado:
-        return encaminhado.split(",")[0].strip()
-    return request.remote_addr or ""
+    bruto = encaminhado.split(",")[0].strip() if encaminhado else (request.remote_addr or "")
+
+    # O servidor escuta em "[::]" (dual-stack IPv6+IPv4) — clientes IPv4
+    # chegam como um endereço "IPv4-mapped" (ex: "::ffff:203.0.113.5").
+    # Sem isso, uma ACL cadastrada em IPv4 puro (ex: "203.0.113.0/24")
+    # pararia de bater com esses clientes silenciosamente.
+    try:
+        endereco = ipaddress.ip_address(bruto)
+    except ValueError:
+        return bruto
+    if isinstance(endereco, ipaddress.IPv6Address) and endereco.ipv4_mapped:
+        return str(endereco.ipv4_mapped)
+    return str(endereco)
 
 
 @app.before_request
