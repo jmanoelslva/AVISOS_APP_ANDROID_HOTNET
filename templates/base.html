@@ -6,10 +6,10 @@
     <title>{% block titulo %}Aviso Broadcaster{% endblock %}</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <style>
         :root {
-            color-scheme: light;
+            color-scheme: light dark;
             --cor-fundo: #F3F4F7;
             --cor-superficie: #FFFFFF;
             --cor-borda: #E7E8EE;
@@ -23,17 +23,57 @@
             --cor-erro: #C0362C;
             --cor-erro-bg: #FCEBEA;
             --cor-erro-borda: #F3C6C2;
-            --raio: 14px;
-            --raio-pequeno: 9px;
+            --cor-hover: #FAFAFB;
+            --cor-input-bg: #FCFCFD;
+            --cor-badge-bg: #FFF3E0;
+            --cor-secundario-bg: #F0F1F4;
+            --cor-secundario-bg-hover: #E4E5EA;
+            --raio: 18px;
+            --raio-pequeno: 10px;
             --sombra: 0 1px 2px rgba(20, 22, 30, 0.04), 0 8px 24px -12px rgba(20, 22, 30, 0.12);
+        }
+        @media (prefers-color-scheme: dark) {
+            :root {
+                --cor-fundo: #121316;
+                --cor-superficie: #1e2025;
+                --cor-borda: #34373e;
+                --cor-texto: #f0f0f0;
+                --cor-texto-secundario: #b8b8bc;
+                --cor-sucesso-bg: rgba(76, 175, 80, 0.16);
+                --cor-sucesso-borda: rgba(76, 175, 80, 0.35);
+                --cor-erro-bg: rgba(244, 67, 54, 0.16);
+                --cor-erro-borda: rgba(244, 67, 54, 0.35);
+                --cor-hover: rgba(255, 255, 255, 0.04);
+                --cor-input-bg: #1e2025;
+                --cor-badge-bg: rgba(242, 143, 59, 0.18);
+                --cor-secundario-bg: rgba(255, 255, 255, 0.06);
+                --cor-secundario-bg-hover: rgba(255, 255, 255, 0.1);
+                --sombra: 0 1px 2px rgba(0, 0, 0, 0.2), 0 8px 24px -12px rgba(0, 0, 0, 0.45);
+            }
         }
         * { box-sizing: border-box; }
         body {
             margin: 0;
-            font-family: "Inter", -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+            font-family: "Plus Jakarta Sans", -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
             background: var(--cor-fundo);
             color: var(--cor-texto);
             -webkit-font-smoothing: antialiased;
+        }
+        @keyframes fade-in {
+            from { opacity: 0; transform: translateY(4px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        main { animation: fade-in 0.22s ease; }
+        button:not(:disabled), nav a, .lista-usuarios li, .item-modelo {
+            -webkit-tap-highlight-color: transparent;
+            transition: transform 0.1s ease, opacity 0.1s ease, background 0.15s ease;
+        }
+        button:not(:disabled):active { transform: scale(0.97); opacity: 0.9; }
+        @media (prefers-reduced-motion: reduce) {
+            *, *::before, *::after {
+                animation-duration: 0.001ms !important;
+                transition-duration: 0.001ms !important;
+            }
         }
         header {
             background: linear-gradient(135deg, var(--cor-acento-escuro), var(--cor-acento));
@@ -141,7 +181,7 @@
             width: 30px;
             height: 30px;
             border-radius: 9px;
-            background: #FFF3E0;
+            background: var(--cor-badge-bg);
             display: flex;
             align-items: center;
             justify-content: center;
@@ -188,14 +228,14 @@
             font-size: 14.5px;
             font-family: inherit;
             color: var(--cor-texto);
-            background: #FCFCFD;
+            background: var(--cor-input-bg);
             transition: border-color 0.15s ease, box-shadow 0.15s ease;
         }
         input[type=text]:focus, input[type=password]:focus, input[type=number]:focus, textarea:focus {
             outline: none;
             border-color: var(--cor-acento);
             box-shadow: 0 0 0 3px rgba(242, 143, 59, 0.18);
-            background: #fff;
+            background: var(--cor-superficie);
         }
         textarea { min-height: 110px; resize: vertical; line-height: 1.5; }
         button {
@@ -262,7 +302,7 @@
             white-space: nowrap;
         }
         .tabela-logs tbody tr:last-child td { border-bottom: none; }
-        .tabela-logs tbody tr:hover { background: #FAFAFB; }
+        .tabela-logs tbody tr:hover { background: var(--cor-hover); }
         .tabela-logs td:last-child, .tabela-logs th:last-child { white-space: normal; }
         .tabela-logs th {
             color: var(--cor-texto-secundario);
@@ -270,7 +310,7 @@
             font-weight: 700;
             text-transform: uppercase;
             letter-spacing: 0.4px;
-            background: #FAFAFB;
+            background: var(--cor-hover);
         }
         .lista-modelos {
             display: flex;
@@ -290,7 +330,7 @@
             border-radius: var(--raio-pequeno);
             transition: background 0.12s ease;
         }
-        .opcao-modelo:hover { background: #FAFAFB; }
+        .opcao-modelo:hover { background: var(--cor-hover); }
         .opcao-modelo input { width: auto; accent-color: var(--cor-acento); }
         .item-modelo {
             display: flex;
@@ -310,13 +350,13 @@
         }
         .botao-remover:hover { background: #9C2C24; }
         .botao-secundario {
-            background: #F0F1F4;
+            background: var(--cor-secundario-bg);
             color: var(--cor-texto);
             margin-top: 0;
             white-space: nowrap;
             box-shadow: none;
         }
-        .botao-secundario:hover { background: #E4E5EA; color: var(--cor-texto); transform: none; }
+        .botao-secundario:hover { background: var(--cor-secundario-bg-hover); color: var(--cor-texto); transform: none; }
         .acoes-modelo {
             display: flex;
             gap: 8px;

@@ -157,3 +157,25 @@ configurado (porta, IPs, senha do usuário original).
 Pede confirmação e remove o serviço systemd, a pasta `/opt/aviso-broadcaster`
 inteira (config.json e service-account.json incluídos) e o usuário de
 sistema `aviso-broadcaster`.
+
+## 8. Identidade visual
+
+O visual do painel foi alinhado ao do app HOTNET (`WEB_APPS/HOTNET_WEB_APP`):
+
+- **Fonte:** Plus Jakarta Sans (mesma do web app), carregada via Google
+  Fonts.
+- **Cores de marca:** o laranja/vermelho do gradiente (`#F28F3B` →
+  `#D94A38`) já é o mesmo `--cor-primaria`/`--cor-primaria-escura` usado
+  lá — não precisou trocar.
+- **Tema escuro automático:** segue a preferência do sistema
+  operacional (`prefers-color-scheme`), sem botão de alternância — a
+  paleta escura reaproveita os mesmos tons de `src/index.css` do web
+  app (`#121316` fundo, `#1e2025` superfície, etc).
+- **Microinterações:** fade-in leve ao carregar a página e um
+  "afundar" sutil (scale) ao clicar em botões, no mesmo espírito do
+  feedback de toque do web app; tudo respeita
+  `prefers-reduced-motion`.
+
+Todo o CSS mora num único bloco `<style>` em `templates/base.html`,
+como variáveis (`--cor-*`, `--raio`, `--sombra`) no `:root` — é ali que
+se ajusta qualquer cor, raio de borda ou sombra do painel inteiro.
