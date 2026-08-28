@@ -5,6 +5,7 @@
 <div class="card">
     <h2 id="tituloFormModelo">Novo modelo</h2>
     <form method="post" id="formModelo">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <input type="hidden" name="acao" id="campoAcao" value="criar">
         <input type="hidden" name="id" id="campoId" value="">
 
@@ -38,6 +39,7 @@
                     Editar
                 </button>
                 <form method="post" onsubmit="return confirm('Remover este modelo?')">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                     <input type="hidden" name="acao" value="excluir">
                     <input type="hidden" name="id" value="{{ t.id }}">
                     <button type="submit" class="botao-remover">Remover</button>

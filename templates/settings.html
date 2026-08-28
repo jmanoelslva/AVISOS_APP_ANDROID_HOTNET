@@ -27,6 +27,7 @@
                     </span>
                     {% if not u.is_admin and u.username != usuario_atual and usuarios|length > 1 %}
                     <form method="post" onsubmit="return confirm('Remover o usuário {{ u.username }}?')">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                         <input type="hidden" name="acao" value="remover_usuario">
                         <input type="hidden" name="usuario_remover" value="{{ u.username }}">
                         <button type="submit" class="botao-remover">Remover</button>
@@ -43,6 +44,7 @@
                 <h2>Adicionar novo usuário</h2>
             </div>
             <form method="post">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                 <input type="hidden" name="acao" value="novo_usuario">
                 <label>Sua senha atual (confirmação de segurança)</label>
                 <input type="password" name="senha_atual_novo_usuario" required>
@@ -67,6 +69,7 @@
 
             <h3>Porta do servidor</h3>
             <form method="post">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                 <input type="hidden" name="acao" value="porta">
                 <label>Porta atual: {{ porta_atual }}</label>
                 <input type="number" name="porta" min="1" max="65535" value="{{ porta_atual }}" required>
@@ -78,6 +81,7 @@
 
             <h3>IPs permitidos (ACL)</h3>
             <form method="post">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                 <input type="hidden" name="acao" value="acl">
                 <label>Um IP ou faixa CIDR por linha — aceita IPv4 e IPv6 (ex: 203.0.113.10, 203.0.113.0/24, 2001:db8::1 ou 2001:db8::/32)</label>
                 <textarea name="allowed_ips" placeholder="Deixe vazio pra permitir qualquer IP (não recomendado)">{{ allowed_ips }}</textarea>

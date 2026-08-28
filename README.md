@@ -100,21 +100,65 @@ diretamente na tela de login.
 
 Esse servidor roda em HTTP simples, o que significa que a senha viaja
 sem criptografia entre o seu navegador e o servidor. Recomendado
-fortemente colocar um **Nginx com Let's Encrypt (certbot)** como proxy
-reverso na frente dessa porta, especialmente se o servidor for acessível
-pela internet (e não só pela sua rede interna/VPN).
+fortemente colocar um proxy reverso com **HTTPS (Let's Encrypt/certbot)**
+na frente dessa porta, especialmente se o servidor for acessível pela
+internet (e não só pela sua rede interna/VPN) — pode ser Nginx ou, como
+já é o caso da instalação atual, **Apache**.
+
+Exemplo mínimo de `VirtualHost` do Apache fazendo proxy pra esse painel
+(ajuste a porta pro valor configurado em Configurações):
+
+```apache
+<VirtualHost *:443>
+    ServerName SEU_DOMINIO
+
+    ProxyPreserveHost On
+    ProxyPass / http://127.0.0.1:8765/
+    ProxyPassReverse / http://127.0.0.1:8765/
+    RequestHeader set X-Forwarded-Proto "https"
+
+    SSLEngine on
+    # ... SSLCertificateFile / SSLCertificateKeyFile (certbot) ...
+</VirtualHost>
+```
+
+O `mod_proxy` do Apache já envia `X-Forwarded-For` sozinho (é assim que
+a lista de IPs permitidos em Configurações identifica o IP real do
+cliente); o `X-Forwarded-Proto` acima **precisa** ser configurado à mão
+(diferente do Nginx, o Apache não manda esse cabeçalho por padrão).
+
+Com o Apache terminando HTTPS, ligue o cookie de sessão como *secure*
+definindo a variável de ambiente `AVISO_BROADCASTER_HTTPS=1` no serviço
+systemd (edite `/etc/systemd/system/aviso-broadcaster.service`,
+adicione `Environment="AVISO_BROADCASTER_HTTPS=1"` na seção `[Service]`
+e rode `systemctl daemon-reload && systemctl restart aviso-broadcaster`).
+Sem isso, o cookie continua funcionando normalmente, só sem essa camada
+extra de proteção — não ative se o Apache ainda não tiver HTTPS
+configurado, senão o login para de funcionar (o navegador não manda o
+cookie de volta por HTTP).
+
+Todo formulário do painel (login, envio de aviso, modelos, usuários,
+configurações) tem proteção contra CSRF (`Flask-WTF`) — se aparecer o
+aviso "Sessão expirada ou formulário inválido", geralmente é sessão
+antiga (aba ficou aberta por muito tempo) ou back/forward do navegador;
+é só tentar de novo.
 
 ## 5. Enviar um aviso
 
 Depois de logado, a tela inicial já é o formulário de envio: título
 (opcional) + mensagem, com opção de escolher um **modelo pronto**
-(gerenciado na aba "Modelos") em vez de escrever do zero toda vez. Ao
-enviar, todo cliente com o app instalado e conectado à internet recebe
-a notificação em poucos segundos.
+(gerenciado na aba "Modelos") em vez de escrever do zero toda vez. O
+botão fica desabilitado durante o envio, pra evitar clique duplo
+mandando o aviso duas vezes. Ao enviar, todo cliente com o app
+instalado e conectado à internet recebe a notificação em poucos
+segundos. Se o envio falhar (ex: Firebase fora do ar), a tela mostra um
+aviso genérico e o detalhe técnico fica registrado na aba "Logs".
 
 A aba **"Logs"** mostra o histórico de login (sucesso/falha), avisos
-enviados e alterações de usuário — os últimos 500 eventos, guardados
-localmente em `acessos.log` (não versionado no git).
+enviados (e falhas de envio), e alterações de usuário — os últimos 500
+eventos, guardados localmente em `acessos.log` (não versionado no
+git). Tem um campo de busca no topo pra filtrar por usuário, IP ou tipo
+de evento.
 
 ## 6. Atualizando uma instalação já existente
 
@@ -167,10 +211,14 @@ O visual do painel foi alinhado ao do app HOTNET (`WEB_APPS/HOTNET_WEB_APP`):
 - **Cores de marca:** o laranja/vermelho do gradiente (`#F28F3B` →
   `#D94A38`) já é o mesmo `--cor-primaria`/`--cor-primaria-escura` usado
   lá — não precisou trocar.
-- **Tema escuro automático:** segue a preferência do sistema
-  operacional (`prefers-color-scheme`), sem botão de alternância — a
-  paleta escura reaproveita os mesmos tons de `src/index.css` do web
-  app (`#121316` fundo, `#1e2025` superfície, etc).
+- **Tema claro/escuro:** segue a preferência do sistema operacional por
+  padrão, com um botão no cabeçalho (🌙/☀️) pra alternar manualmente —
+  a escolha fica salva no navegador (`localStorage`), mesmo padrão de
+  `src/utils/tema.ts` do web app. Paleta escura reaproveita os mesmos
+  tons de `src/index.css` (`#121316` fundo, `#1e2025` superfície, etc).
+- **Mostrar/ocultar senha:** todo campo de senha do painel ganha um
+  ícone de olho pra revelar o texto digitado (aplicado automaticamente
+  via JS em `base.html`, não precisa repetir por template).
 - **Microinterações:** fade-in leve ao carregar a página e um
   "afundar" sutil (scale) ao clicar em botões, no mesmo espírito do
   feedback de toque do web app; tudo respeita

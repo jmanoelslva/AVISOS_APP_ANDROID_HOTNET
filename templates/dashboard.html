@@ -39,6 +39,7 @@
     {% endif %}
 
     <form method="post" onsubmit="return confirmarEnvio()">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <label>Título (opcional)</label>
         <input type="text" id="campoTitulo" name="titulo" placeholder="Aviso da HOTNET" maxlength="80">
 
@@ -51,7 +52,7 @@
             placeholder="Ex: Manutenção programada hoje das 23h às 01h na região X. A conexão pode oscilar nesse período."
         ></textarea>
 
-        <button type="submit">Enviar para todos</button>
+        <button type="submit" id="botaoEnviarAviso">Enviar para todos</button>
     </form>
 </div>
 
@@ -65,7 +66,13 @@
 
     function confirmarEnvio() {
         const mensagem = document.getElementById('campoMensagem').value;
-        return confirm('Confirma o envio deste aviso para TODOS os usuários agora?\n\n' + mensagem);
+        const confirmado = confirm('Confirma o envio deste aviso para TODOS os usuários agora?\n\n' + mensagem);
+        if (confirmado) {
+            const botao = document.getElementById('botaoEnviarAviso');
+            botao.disabled = true;
+            botao.textContent = 'Enviando...';
+        }
+        return confirmado;
     }
 </script>
 {% endblock %}

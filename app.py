@@ -1,9 +1,12 @@
 import ipaddress
+import os
 import time
 import uuid
 from functools import wraps
 
 from flask import Flask, abort, flash, redirect, render_template, request, session, url_for
+from flask_wtf import CSRFProtect
+from flask_wtf.csrf import CSRFError
 from werkzeug.security import check_password_hash, generate_password_hash
 
 import access_log
@@ -13,6 +16,21 @@ from security import validar_forca_senha
 
 app = Flask(__name__)
 app.secret_key = config_store.carregar()["secret_key"]
+csrf = CSRFProtect(app)
+
+# O painel roda atrás de um Apache fazendo proxy reverso. Por padrão o
+# cookie de sessão não exige HTTPS (senão logins quebrariam em instalações
+# só-HTTP numa rede interna). Se o Apache na frente já terminar TLS,
+# defina AVISO_BROADCASTER_HTTPS=1 no serviço systemd (ver README) pra
+# marcar o cookie como Secure.
+app.config["SESSION_COOKIE_SECURE"] = os.environ.get("AVISO_BROADCASTER_HTTPS") == "1"
+
+
+@app.errorhandler(CSRFError)
+def csrf_invalido(e):
+    flash("Sessão expirada ou formulário inválido — tente de novo.", "erro")
+    destino = request.referrer or url_for("login")
+    return redirect(destino)
 
 # Bloqueio simples por IP após tentativas de senha erradas seguidas —
 # guardado em memória (reinicia se o serviço reiniciar, o que é aceitável
@@ -190,7 +208,17 @@ def dashboard():
                 )
                 flash("Aviso enviado com sucesso!", "sucesso")
             except Exception as e:
-                flash(f"Erro ao enviar: {e}", "erro")
+                app.logger.exception("Falha ao enviar aviso")
+                access_log.registrar(
+                    "aviso_falha", usuario=session.get("usuario", ""),
+                    ip=_ip_do_cliente(), detalhes=str(e),
+                )
+                flash(
+                    "Não foi possível enviar o aviso agora. Tente de novo em "
+                    "instantes; se persistir, avise o administrador (o "
+                    "detalhe técnico ficou registrado em Logs).",
+                    "erro",
+                )
 
     cfg = config_store.carregar()
     return render_template("dashboard.html", templates=cfg.get("templates", []))

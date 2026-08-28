@@ -11,6 +11,7 @@
             minúscula, número e caractere especial.
         </p>
         <form method="post" action="{{ url_for('definir_senha_inicial') }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
             <label>Usuário</label>
             <input type="text" name="usuario" required autofocus>
             <label>Senha</label>
@@ -22,6 +23,7 @@
     {% else %}
         <h2>Entrar</h2>
         <form method="post">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
             <label>Usuário</label>
             <input type="text" name="usuario" required autofocus>
             <label>Senha</label>

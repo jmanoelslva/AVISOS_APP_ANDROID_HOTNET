@@ -6,6 +6,7 @@
     <h2>Trocar minha senha</h2>
     <p class="dica">Logado como: <strong>{{ usuario_atual }}</strong></p>
     <form method="post">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <label>Senha atual</label>
         <input type="password" name="senha_atual" required autofocus>
         <label>Nova senha</label>

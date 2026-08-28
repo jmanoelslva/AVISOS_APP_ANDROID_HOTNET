@@ -4,6 +4,20 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>{% block titulo %}Aviso Broadcaster{% endblock %}</title>
+    <script>
+        // Aplica a escolha manual de tema (se houver) antes da primeira
+        // pintura da página, pra não "piscar" no tema errado. Sem escolha
+        // manual salva, o CSS abaixo já segue o tema do sistema sozinho,
+        // sem precisar de JS nenhum.
+        (function () {
+            try {
+                var t = localStorage.getItem('aviso-broadcaster-tema');
+                if (t === 'light' || t === 'dark') {
+                    document.documentElement.setAttribute('data-theme', t);
+                }
+            } catch (e) {}
+        })();
+    </script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -32,8 +46,14 @@
             --raio-pequeno: 10px;
             --sombra: 0 1px 2px rgba(20, 22, 30, 0.04), 0 8px 24px -12px rgba(20, 22, 30, 0.12);
         }
+        /* Escuro automático (segue o SO) — só quando o cliente não fez
+           escolha manual (nesse caso data-theme="light" força claro mesmo
+           com o SO escuro). Repetido abaixo em :root[data-theme="dark"]
+           pra escolha manual de escuro valer mesmo com SO claro — dois
+           lugares de propósito, um "dono" cada (sistema vs. escolha do
+           cliente), igual ao padrão usado no app HOTNET. */
         @media (prefers-color-scheme: dark) {
-            :root {
+            :root:not([data-theme="light"]) {
                 --cor-fundo: #121316;
                 --cor-superficie: #1e2025;
                 --cor-borda: #34373e;
@@ -50,6 +70,23 @@
                 --cor-secundario-bg-hover: rgba(255, 255, 255, 0.1);
                 --sombra: 0 1px 2px rgba(0, 0, 0, 0.2), 0 8px 24px -12px rgba(0, 0, 0, 0.45);
             }
+        }
+        :root[data-theme="dark"] {
+            --cor-fundo: #121316;
+            --cor-superficie: #1e2025;
+            --cor-borda: #34373e;
+            --cor-texto: #f0f0f0;
+            --cor-texto-secundario: #b8b8bc;
+            --cor-sucesso-bg: rgba(76, 175, 80, 0.16);
+            --cor-sucesso-borda: rgba(76, 175, 80, 0.35);
+            --cor-erro-bg: rgba(244, 67, 54, 0.16);
+            --cor-erro-borda: rgba(244, 67, 54, 0.35);
+            --cor-hover: rgba(255, 255, 255, 0.04);
+            --cor-input-bg: #1e2025;
+            --cor-badge-bg: rgba(242, 143, 59, 0.18);
+            --cor-secundario-bg: rgba(255, 255, 255, 0.06);
+            --cor-secundario-bg-hover: rgba(255, 255, 255, 0.1);
+            --sombra: 0 1px 2px rgba(0, 0, 0, 0.2), 0 8px 24px -12px rgba(0, 0, 0, 0.45);
         }
         * { box-sizing: border-box; }
         body {
@@ -137,6 +174,31 @@
         }
         nav a:hover { background: rgba(255, 255, 255, 0.14); color: #fff; }
         nav a.ativo { background: #fff; color: var(--cor-acento-escuro); }
+        .header-direita {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            flex-wrap: wrap;
+        }
+        .botao-tema {
+            width: 34px;
+            height: 34px;
+            min-width: 34px;
+            margin: 0;
+            padding: 0;
+            border: none;
+            border-radius: 999px;
+            background: rgba(255, 255, 255, 0.18);
+            color: #fff;
+            font-size: 15px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            box-shadow: none;
+            flex-shrink: 0;
+        }
+        .botao-tema:hover { background: rgba(255, 255, 255, 0.28); transform: none; }
         main { max-width: 680px; margin: 40px auto; padding: 0 20px 40px; }
         .card {
             background: var(--cor-superficie);
@@ -254,6 +316,25 @@
         }
         button:hover { background: var(--cor-acento-escuro); transform: translateY(-1px); }
         button:active { transform: translateY(0); }
+        button:disabled { opacity: 0.65; cursor: default; }
+        .campo-senha { position: relative; }
+        .campo-senha input { padding-right: 42px; }
+        .alternar-senha {
+            position: absolute;
+            top: 50%;
+            right: 2px;
+            transform: translateY(-50%);
+            margin: 0;
+            padding: 6px 10px;
+            border: none;
+            background: transparent;
+            box-shadow: none;
+            color: var(--cor-texto-secundario);
+            font-size: 15px;
+            line-height: 1;
+            cursor: pointer;
+        }
+        .alternar-senha:hover { background: var(--cor-hover); border-radius: 999px; transform: translateY(-50%); }
         .flash {
             padding: 13px 16px;
             border-radius: var(--raio-pequeno);
@@ -409,18 +490,21 @@
                 <p class="subtitulo">HOTNET</p>
             </div>
         </div>
-        {% if session.get('autenticado') %}
-        <nav>
-            <a href="{{ url_for('dashboard') }}" class="{{ 'ativo' if request.endpoint == 'dashboard' }}">Enviar aviso</a>
-            <a href="{{ url_for('modelos') }}" class="{{ 'ativo' if request.endpoint == 'modelos' }}">Modelos</a>
-            <a href="{{ url_for('logs') }}" class="{{ 'ativo' if request.endpoint == 'logs' }}">Logs</a>
-            {% if usuario_e_admin %}
-            <a href="{{ url_for('configuracoes') }}" class="{{ 'ativo' if request.endpoint == 'configuracoes' }}">Configurações</a>
+        <div class="header-direita">
+            {% if session.get('autenticado') %}
+            <nav>
+                <a href="{{ url_for('dashboard') }}" class="{{ 'ativo' if request.endpoint == 'dashboard' }}">Enviar aviso</a>
+                <a href="{{ url_for('modelos') }}" class="{{ 'ativo' if request.endpoint == 'modelos' }}">Modelos</a>
+                <a href="{{ url_for('logs') }}" class="{{ 'ativo' if request.endpoint == 'logs' }}">Logs</a>
+                {% if usuario_e_admin %}
+                <a href="{{ url_for('configuracoes') }}" class="{{ 'ativo' if request.endpoint == 'configuracoes' }}">Configurações</a>
+                {% endif %}
+                <a href="{{ url_for('minha_senha') }}" class="{{ 'ativo' if request.endpoint == 'minha_senha' }}">Minha senha</a>
+                <a href="{{ url_for('logout') }}">Sair</a>
+            </nav>
             {% endif %}
-            <a href="{{ url_for('minha_senha') }}" class="{{ 'ativo' if request.endpoint == 'minha_senha' }}">Minha senha</a>
-            <a href="{{ url_for('logout') }}">Sair</a>
-        </nav>
-        {% endif %}
+            <button type="button" id="botaoTema" class="botao-tema" aria-label="Alternar tema claro/escuro" title="Alternar tema claro/escuro">🌙</button>
+        </div>
     </header>
     <main>
         {% with mensagens = get_flashed_messages(with_categories=true) %}
@@ -432,5 +516,65 @@
         {% endwith %}
         {% block conteudo %}{% endblock %}
     </main>
+    <script>
+        (function () {
+            // Alternância manual de tema — persiste em localStorage; sem
+            // escolha manual, o CSS já segue o tema do sistema sozinho
+            // (ver bloco @media no <style> e o script anti-flash no <head>).
+            var CHAVE_TEMA = 'aviso-broadcaster-tema';
+            var botaoTema = document.getElementById('botaoTema');
+
+            function temaDoSistema() {
+                return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+            }
+
+            function temaEfetivo() {
+                var salvo = localStorage.getItem(CHAVE_TEMA);
+                return (salvo === 'light' || salvo === 'dark') ? salvo : temaDoSistema();
+            }
+
+            function atualizarIconeTema() {
+                if (!botaoTema) return;
+                var escuro = temaEfetivo() === 'dark';
+                botaoTema.textContent = escuro ? '☀️' : '🌙';
+                botaoTema.setAttribute('aria-label', escuro ? 'Mudar para tema claro' : 'Mudar para tema escuro');
+            }
+
+            if (botaoTema) {
+                botaoTema.addEventListener('click', function () {
+                    var novo = temaEfetivo() === 'dark' ? 'light' : 'dark';
+                    localStorage.setItem(CHAVE_TEMA, novo);
+                    document.documentElement.setAttribute('data-theme', novo);
+                    atualizarIconeTema();
+                });
+            }
+            atualizarIconeTema();
+        })();
+
+        (function () {
+            // Botão de mostrar/ocultar senha em todo campo type=password do
+            // site — não precisa repetir isso em cada template.
+            document.querySelectorAll('input[type=password]').forEach(function (campo) {
+                var wrapper = document.createElement('div');
+                wrapper.className = 'campo-senha';
+                campo.parentNode.insertBefore(wrapper, campo);
+                wrapper.appendChild(campo);
+
+                var botao = document.createElement('button');
+                botao.type = 'button';
+                botao.className = 'alternar-senha';
+                botao.textContent = '👁';
+                botao.setAttribute('aria-label', 'Mostrar senha');
+                wrapper.appendChild(botao);
+
+                botao.addEventListener('click', function () {
+                    var mostrando = campo.type === 'text';
+                    campo.type = mostrando ? 'password' : 'text';
+                    botao.textContent = mostrando ? '👁' : '🙈';
+                    botao.setAttribute('aria-label', mostrando ? 'Mostrar senha' : 'Ocultar senha');
+                });
+            });
+        })();
+    </script>
 </body>
 </html>

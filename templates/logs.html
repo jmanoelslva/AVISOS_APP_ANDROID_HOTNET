@@ -11,6 +11,8 @@
     </p>
 
     {% if eventos %}
+    <label for="filtroLogs">Buscar (usuário, evento, IP ou detalhes)</label>
+    <input type="text" id="filtroLogs" placeholder="Digite pra filtrar a tabela abaixo...">
     <div class="tabela-logs-scroll">
         <table class="tabela-logs">
             <thead>
@@ -30,6 +32,7 @@
                         {% if e.evento == 'login_sucesso' %}Login (sucesso)
                         {% elif e.evento == 'login_falha' %}Login (falha)
                         {% elif e.evento == 'aviso_enviado' %}Aviso enviado
+                        {% elif e.evento == 'aviso_falha' %}Falha ao enviar aviso
                         {% elif e.evento == 'usuario_criado' %}Usuário criado
                         {% elif e.evento == 'usuario_removido' %}Usuário removido
                         {% elif e.evento == 'senha_alterada' %}Senha alterada
@@ -44,9 +47,28 @@
             </tbody>
         </table>
     </div>
+    <p class="dica" id="filtroSemResultado" style="display:none;">Nenhum evento corresponde à busca.</p>
     {% else %}
     <p class="dica">Nenhum evento registrado ainda.</p>
     {% endif %}
 </div>
 
+<script>
+    (function () {
+        var campo = document.getElementById('filtroLogs');
+        if (!campo) return;
+        var linhas = document.querySelectorAll('.tabela-logs tbody tr');
+        var semResultado = document.getElementById('filtroSemResultado');
+        campo.addEventListener('input', function () {
+            var termo = campo.value.trim().toLowerCase();
+            var visiveis = 0;
+            linhas.forEach(function (linha) {
+                var bate = !termo || linha.textContent.toLowerCase().includes(termo);
+                linha.style.display = bate ? '' : 'none';
+                if (bate) visiveis++;
+            });
+            semResultado.style.display = visiveis === 0 ? 'block' : 'none';
+        });
+    })();
+</script>
 {% endblock %}
