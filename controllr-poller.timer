@@ -1,0 +1,10 @@
+[Unit]
+Description=Roda o Controllr Poller a cada 10 minutos
+
+[Timer]
+OnBootSec=2min
+OnUnitActiveSec=10min
+Unit=controllr-poller.service
+
+[Install]
+WantedBy=timers.target

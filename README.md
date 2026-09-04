@@ -227,3 +227,57 @@ O visual do painel foi alinhado ao do app HOTNET (`WEB_APPS/HOTNET_WEB_APP`):
 Todo o CSS mora num único bloco `<style>` em `templates/base.html`,
 como variáveis (`--cor-*`, `--raio`, `--sombra`) no `:root` — é ali que
 se ajusta qualquer cor, raio de borda ou sombra do painel inteiro.
+
+## 9. Poller de confirmação de pagamento (piloto)
+
+Peça separada do painel web, sem interface própria ainda: consulta o
+Controllr periodicamente (como um admin, não como cliente) e manda push
+individual só pra conta que teve uma fatura paga — diferente do
+`avisos_gerais`, que vai pra todo mundo. Não altera nada no Controllr,
+só lê (`invoice_ctl/invoice/list`) com um usuário dedicado.
+
+**Por que existe**: o Controllr não tem webhook/push próprio, então "em
+tempo real" aqui significa "checagem periódica" (a cada 10min, por
+padrão) — o poller guarda o que já viu em `poller_state.json` e só
+notifica na transição de "sem data de crédito" pra "com data de
+crédito", nunca de novo pra quem já foi notificado.
+
+### Como identifica a conta
+
+O app assina, no login, o tópico FCM `conta_<hash>` — hash SHA-256 (16
+primeiros caracteres hex) do CPF só com dígitos (ver `topico_conta_cpf()`
+em `poller.py` e o equivalente em `SessionManager.kt` no app Android).
+Nunca é o CPF cru — evita expor PII no nome do tópico.
+
+### Configuração
+
+1. No Controllr, crie um usuário admin **dedicado, só leitura** pra essa
+   função (não reaproveite login pessoal).
+2. Rode `python poller.py` uma vez manualmente — ele cria
+   `controllr_config.json` com um template e para, avisando o que
+   falta preencher (`base_url` da área **administrativa**, porta
+   8080/8081/8443 conforme configurado no Controllr — não é a mesma
+   porta 443 que o app Android usa; `usuario`; `senha`).
+3. Preencha o arquivo e rode `python poller.py` de novo pra testar.
+4. Instale como serviço + timer do systemd:
+
+```bash
+cp controllr-poller.service controllr-poller.timer /etc/systemd/system/
+systemctl daemon-reload
+systemctl enable --now controllr-poller.timer
+```
+
+5. Acompanhe pela aba **Logs** do painel (eventos `poller_ciclo` e
+   `poller_falha`) — reaproveita o mesmo `access_log.py` dos outros
+   eventos.
+
+Pra mudar o intervalo (padrão 10min): edite `OnUnitActiveSec` em
+`controllr-poller.timer`, depois `systemctl daemon-reload && systemctl restart controllr-poller.timer`.
+
+`controllr_config.json` e `poller_state.json` seguem o mesmo padrão de
+`config.json`/`service-account.json`: nunca versionados no git,
+permissão `600`.
+
+**Status**: piloto — só confirmação de pagamento. Chamado de suporte
+atualizado e reforço de fatura em atraso ficam de fora até esse validar
+bem em produção.

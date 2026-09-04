@@ -32,3 +32,18 @@ def enviar_aviso(titulo: str, corpo: str) -> str:
         android=messaging.AndroidConfig(priority="high"),
     )
     return messaging.send(mensagem)
+
+
+def enviar_para_conta(topico_conta: str, tipo: str, dados: dict) -> str:
+    """Envia um evento (ex: pagamento confirmado) só pro tópico de uma conta
+    específica (ver topico_conta_cpf em poller.py) — não pro avisos_gerais.
+    `dados` vira campos extras no payload data-only, junto com "type".
+    """
+    _inicializar()
+    payload = {"type": tipo, **{k: str(v) for k, v in dados.items()}}
+    mensagem = messaging.Message(
+        data=payload,
+        topic=topico_conta,
+        android=messaging.AndroidConfig(priority="high"),
+    )
+    return messaging.send(mensagem)

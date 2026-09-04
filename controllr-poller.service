@@ -1,0 +1,10 @@
+[Unit]
+Description=Controllr Poller - HOTNET (confirmação de pagamento via FCM)
+After=network.target
+
+[Service]
+Type=oneshot
+User=aviso-broadcaster
+WorkingDirectory=/opt/aviso-broadcaster
+Environment="PATH=/opt/aviso-broadcaster/venv/bin"
+ExecStart=/opt/aviso-broadcaster/venv/bin/python poller.py
