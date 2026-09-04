@@ -257,9 +257,16 @@ Nunca é o CPF cru — evita expor PII no nome do tópico.
    `controllr_config.json` com um template e para, avisando o que
    falta preencher (`base_url` da área **administrativa**, porta
    8080/8081/8443 conforme configurado no Controllr — não é a mesma
-   porta 443 que o app Android usa; `usuario`; `senha`).
-3. Preencha o arquivo e rode `python poller.py` de novo pra testar.
-4. Instale como serviço + timer do systemd:
+   porta 443 que o app Android usa; `usuario`; `senha`). Validado em
+   produção: `https://controllr.hotnet.net.br:8443/` — atenção ao
+   `.net.br`, sem ele o domínio não resolve.
+3. Preencha o arquivo e rode `python poller.py` **manualmente** de novo
+   — essa primeira execução real só grava a baseline (nenhuma
+   notificação é enviada nela, mesmo que existam milhares de faturas já
+   pagas na janela — ver comentário em `poller.py`). Confirme pela aba
+   Logs (`poller_ciclo`, "baseline gravada") antes de seguir.
+4. Só depois da baseline gravada, instale como serviço + timer do
+   systemd:
 
 ```bash
 cp controllr-poller.service controllr-poller.timer /etc/systemd/system/
@@ -278,6 +285,8 @@ Pra mudar o intervalo (padrão 10min): edite `OnUnitActiveSec` em
 `config.json`/`service-account.json`: nunca versionados no git,
 permissão `600`.
 
-**Status**: piloto — só confirmação de pagamento. Chamado de suporte
-atualizado e reforço de fatura em atraso ficam de fora até esse validar
-bem em produção.
+**Status**: piloto — só confirmação de pagamento. Lado do Controllr
+(login admin, busca em lote, campos usados) já validado contra produção;
+falta só validar o push chegando de fato no aparelho depois do deploy.
+Chamado de suporte atualizado e reforço de fatura em atraso ficam de
+fora até esse validar bem em produção.
