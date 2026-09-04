@@ -36,6 +36,13 @@ def main() -> int:
         print(str(e), file=sys.stderr)
         return 1
 
+    # CRÍTICO: sem poller_state.json ainda, TODA fatura já paga dentro da
+    # janela pareceria "nova" — dispararia push de pagamento confirmado pra
+    # milhares de clientes de uma vez só, coisa antiga que ninguém pediu.
+    # Na primeira execução só grava o estado atual (baseline), sem notificar
+    # ninguém; só a partir do 2º ciclo é que transições viram push de verdade.
+    primeira_execucao = not state_store.STATE_PATH.exists()
+
     estado = state_store.carregar()
     faturas_vistas = estado.setdefault("faturas", {})
 
@@ -55,8 +62,9 @@ def main() -> int:
         credito_anterior = faturas_vistas.get(pk)
 
         # Só notifica na transição vazio -> preenchido, nunca de novo pra
-        # quem já foi visto pago (evita reenviar todo ciclo).
-        if credito_atual and not credito_anterior:
+        # quem já foi visto pago (evita reenviar todo ciclo), e nunca na
+        # primeira execução (ver comentário acima — só grava a baseline).
+        if credito_atual and not credito_anterior and not primeira_execucao:
             cpf = fatura.get("client_doc1") or ""
             if cpf:
                 try:
@@ -78,10 +86,12 @@ def main() -> int:
         faturas_vistas[pk] = credito_atual
 
     state_store.salvar(estado)
-    access_log.registrar(
-        "poller_ciclo",
-        detalhes=f"{len(faturas)} faturas verificadas, {notificadas} notificações enviadas",
+    detalhe = (
+        f"{len(faturas)} faturas verificadas, baseline gravada (sem notificar)"
+        if primeira_execucao
+        else f"{len(faturas)} faturas verificadas, {notificadas} notificações enviadas"
     )
+    access_log.registrar("poller_ciclo", detalhes=detalhe)
     return 0
 
 
