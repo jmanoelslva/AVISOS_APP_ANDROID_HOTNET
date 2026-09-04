@@ -1,11 +1,10 @@
-"""Ponto de entrada do poller de pagamento — roda uma vez e sai (chamado
-por systemd timer, ver controllr-poller.timer). Sem loop/scheduler interno
-de propósito: mantém o processo simples e sem estado entre execuções além
-do que já está em poller_state.json.
+"""Ponto de entrada do poller (pagamento confirmado + chamado atualizado) —
+roda uma vez e sai (chamado por systemd timer, ver controllr-poller.timer).
+Sem loop/scheduler interno de propósito: mantém o processo simples e sem
+estado entre execuções além do que já está em poller_state.json.
 
-Piloto: só confirmação de pagamento (invoice_date_credit passando de vazio
-pra preenchido). Chamados e reforço de atraso ficam pra depois, se esse
-piloto validar bem.
+Reforço de fatura em atraso fica de fora por enquanto, se os dois casos
+acima validarem bem em produção.
 """
 import hashlib
 import re
@@ -22,38 +21,16 @@ _SO_DIGITOS = re.compile(r"\D+")
 
 def topico_conta_cpf(cpf: str) -> str:
     """Mesmo cálculo que o app Android faz ao assinar o tópico no login —
-    ver topicoContaCpf() em SessionManager.kt/AuthRepository.kt. Precisa
-    ficar idêntico dos dois lados, senão o push nunca chega a ninguém.
+    ver topicoContaCpf() em SessionManager.kt. Precisa ficar idêntico dos
+    dois lados, senão o push nunca chega a ninguém.
     """
     digitos = _SO_DIGITOS.sub("", cpf or "")
     return "conta_" + hashlib.sha256(digitos.encode("utf-8")).hexdigest()[:16]
 
 
-def main() -> int:
-    try:
-        cfg = controllr_config.carregar()
-    except RuntimeError as e:
-        print(str(e), file=sys.stderr)
-        return 1
-
-    # CRÍTICO: sem poller_state.json ainda, TODA fatura já paga dentro da
-    # janela pareceria "nova" — dispararia push de pagamento confirmado pra
-    # milhares de clientes de uma vez só, coisa antiga que ninguém pediu.
-    # Na primeira execução só grava o estado atual (baseline), sem notificar
-    # ninguém; só a partir do 2º ciclo é que transições viram push de verdade.
-    primeira_execucao = not state_store.STATE_PATH.exists()
-
-    estado = state_store.carregar()
+def processar_faturas(cliente: ControllrClient, estado: dict, primeira_vez_faturas: bool) -> tuple[int, int]:
     faturas_vistas = estado.setdefault("faturas", {})
-
-    cliente = ControllrClient(cfg["base_url"], cfg["usuario"], cfg["senha"])
-    try:
-        cliente.login()
-        faturas = cliente.buscar_faturas()
-    except Exception as e:
-        access_log.registrar("poller_falha", detalhes=f"busca de faturas: {e}")
-        print(f"Falha ao consultar Controllr: {e}", file=sys.stderr)
-        return 1
+    faturas = cliente.buscar_faturas()
 
     notificadas = 0
     for fatura in faturas:
@@ -63,8 +40,9 @@ def main() -> int:
 
         # Só notifica na transição vazio -> preenchido, nunca de novo pra
         # quem já foi visto pago (evita reenviar todo ciclo), e nunca na
-        # primeira execução (ver comentário acima — só grava a baseline).
-        if credito_atual and not credito_anterior and not primeira_execucao:
+        # primeira execução (CRÍTICO: sem estado prévio, toda fatura já paga
+        # dentro da janela pareceria "nova" e notificaria milhares de uma vez).
+        if credito_atual and not credito_anterior and not primeira_vez_faturas:
             cpf = fatura.get("client_doc1") or ""
             if cpf:
                 try:
@@ -79,19 +57,100 @@ def main() -> int:
                     )
                     notificadas += 1
                 except Exception as e:
-                    access_log.registrar(
-                        "poller_falha", detalhes=f"envio fatura {pk}: {e}"
-                    )
+                    access_log.registrar("poller_falha", detalhes=f"envio fatura {pk}: {e}")
 
         faturas_vistas[pk] = credito_atual
 
+    return len(faturas), notificadas
+
+
+def processar_chamados(cliente: ControllrClient, estado: dict, primeira_vez_chamados: bool) -> tuple[int, int]:
+    chamados_vistos = estado.setdefault("chamados", {})
+    chamados = cliente.buscar_chamados()
+
+    notificadas = 0
+    for chamado in chamados:
+        pk = chamado.get("ticket_pk")
+        pk_str = str(pk)
+        ultimo_atual = chamado.get("ticket_date_last")
+        ultimo_anterior = chamados_vistos.get(pk_str)
+
+        if ultimo_atual and ultimo_atual != ultimo_anterior and not primeira_vez_chamados:
+            cpf = chamado.get("client_doc1") or ""
+            if cpf:
+                try:
+                    # Só notifica se quem mexeu por último foi a equipe, não
+                    # o próprio cliente respondendo pelo app (op_client=True
+                    # geraria uma notificação "seu chamado foi atualizado"
+                    # sobre a mensagem que ele mesmo acabou de mandar).
+                    if cliente.ultimo_op_e_de_staff(pk):
+                        enviar_para_conta(
+                            topico_conta_cpf(cpf),
+                            "chamado_atualizado",
+                            {
+                                "ticket_pk": pk_str,
+                                "ticket_protocol": chamado.get("ticket_protocol") or "",
+                                "category_name": chamado.get("category_name") or "",
+                            },
+                        )
+                        notificadas += 1
+                except Exception as e:
+                    access_log.registrar("poller_falha", detalhes=f"envio chamado {pk_str}: {e}")
+
+        chamados_vistos[pk_str] = ultimo_atual
+
+    return len(chamados), notificadas
+
+
+def main() -> int:
+    try:
+        cfg = controllr_config.carregar()
+    except RuntimeError as e:
+        print(str(e), file=sys.stderr)
+        return 1
+
+    estado = state_store.carregar()
+    # Por categoria, não pelo arquivo inteiro — "faturas" pode já ter
+    # baseline de um piloto anterior enquanto "chamados" ainda não tem
+    # nenhuma (é exatamente esse caso hoje). Cada categoria nova adicionada
+    # aqui precisa da própria checagem, senão repete o mesmo bug: tudo que
+    # já está "ativo" na janela pareceria novo e notificaria em massa.
+    primeira_vez_faturas = "faturas" not in estado
+    primeira_vez_chamados = "chamados" not in estado
+
+    cliente = ControllrClient(cfg["base_url"], cfg["usuario"], cfg["senha"])
+    try:
+        cliente.login()
+    except Exception as e:
+        access_log.registrar("poller_falha", detalhes=f"login: {e}")
+        print(f"Falha ao logar no Controllr: {e}", file=sys.stderr)
+        return 1
+
+    try:
+        total_faturas, notif_faturas = processar_faturas(cliente, estado, primeira_vez_faturas)
+    except Exception as e:
+        access_log.registrar("poller_falha", detalhes=f"busca de faturas: {e}")
+        print(f"Falha ao consultar faturas: {e}", file=sys.stderr)
+        return 1
+
+    try:
+        total_chamados, notif_chamados = processar_chamados(cliente, estado, primeira_vez_chamados)
+    except Exception as e:
+        access_log.registrar("poller_falha", detalhes=f"busca de chamados: {e}")
+        print(f"Falha ao consultar chamados: {e}", file=sys.stderr)
+        return 1
+
     state_store.salvar(estado)
-    detalhe = (
-        f"{len(faturas)} faturas verificadas, baseline gravada (sem notificar)"
-        if primeira_execucao
-        else f"{len(faturas)} faturas verificadas, {notificadas} notificações enviadas"
+    partes = []
+    partes.append(
+        f"{total_faturas} faturas, baseline gravada" if primeira_vez_faturas
+        else f"{total_faturas} faturas ({notif_faturas} notificadas)"
     )
-    access_log.registrar("poller_ciclo", detalhes=detalhe)
+    partes.append(
+        f"{total_chamados} chamados, baseline gravada" if primeira_vez_chamados
+        else f"{total_chamados} chamados ({notif_chamados} notificados)"
+    )
+    access_log.registrar("poller_ciclo", detalhes=", ".join(partes))
     return 0
 
 

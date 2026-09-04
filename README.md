@@ -228,19 +228,27 @@ Todo o CSS mora num único bloco `<style>` em `templates/base.html`,
 como variáveis (`--cor-*`, `--raio`, `--sombra`) no `:root` — é ali que
 se ajusta qualquer cor, raio de borda ou sombra do painel inteiro.
 
-## 9. Poller de confirmação de pagamento (piloto)
+## 9. Poller de eventos por conta (piloto)
 
 Peça separada do painel web, sem interface própria ainda: consulta o
 Controllr periodicamente (como um admin, não como cliente) e manda push
-individual só pra conta que teve uma fatura paga — diferente do
-`avisos_gerais`, que vai pra todo mundo. Não altera nada no Controllr,
-só lê (`invoice_ctl/invoice/list`) com um usuário dedicado.
+individual só pra conta afetada — diferente do `avisos_gerais`, que vai
+pra todo mundo. Não altera nada no Controllr, só lê (`invoice_ctl/invoice/list`,
+`support_ctl/ticket/list`, `support_ctl/op/list`) com um usuário dedicado.
 
 **Por que existe**: o Controllr não tem webhook/push próprio, então "em
 tempo real" aqui significa "checagem periódica" (a cada 10min, por
-padrão) — o poller guarda o que já viu em `poller_state.json` e só
-notifica na transição de "sem data de crédito" pra "com data de
-crédito", nunca de novo pra quem já foi notificado.
+padrão) — o poller guarda o que já viu em `poller_state.json`, por
+categoria (`faturas`/`chamados`), e só notifica em cima de uma transição
+real, nunca de novo pra quem já foi notificado:
+
+- **Pagamento confirmado**: `invoice_date_credit` passa de vazio pra
+  preenchido.
+- **Chamado atualizado**: `ticket_date_last` muda **e** a última
+  operação do chamado (`support_ctl/op/list`) foi escrita pela equipe
+  (`op_client=False`) — se foi o próprio cliente quem mexeu por último
+  (respondeu pelo app), não notifica, senão seria um aviso sobre a
+  própria ação da pessoa.
 
 ### Como identifica a conta
 
@@ -285,11 +293,16 @@ Pra mudar o intervalo (padrão 10min): edite `OnUnitActiveSec` em
 `config.json`/`service-account.json`: nunca versionados no git,
 permissão `600`.
 
-**Status**: piloto — só confirmação de pagamento. Validado de ponta a
-ponta contra produção: login admin, busca em lote (11204 faturas),
-gravação de baseline sem notificar, e envio real via FCM (Firebase
-aceitou a mensagem, topic de teste com CPF sintético — zero risco de
-notificar cliente real). Falta só confirmar que o push chega e aparece
-certo no aparelho, depois que a atualização do app for instalada num
-device de verdade. Chamado de suporte atualizado e reforço de fatura em
-atraso ficam de fora até esse validar bem em produção.
+**Status**: piloto — pagamento confirmado e chamado atualizado, os dois
+validados de ponta a ponta em produção (login admin, busca em lote,
+baseline gravada por categoria sem notificar, envio real via FCM e
+recebimento confirmado num aparelho de teste, com o app aberto e
+fechado). Reforço de fatura em atraso fica de fora por enquanto.
+
+**Importante ao adicionar uma categoria nova**: a checagem de "primeira
+execução" em `main()` (`poller.py`) é por categoria (`"faturas" not in
+estado`, `"chamados" not in estado`), não pelo arquivo inteiro — uma
+categoria nova populando o mesmo `poller_state.json` que outra já usa
+precisa da própria checagem, senão repete o bug já corrigido aqui uma
+vez: tudo que já está "ativo" na janela pareceria novo e notificaria em
+massa na primeira vez que aquela categoria rodar.

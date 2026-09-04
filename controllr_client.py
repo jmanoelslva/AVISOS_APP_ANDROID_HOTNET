@@ -1,3 +1,4 @@
+import datetime
 import json
 
 import requests
@@ -39,8 +40,6 @@ class ControllrClient:
         à frente — evita puxar o histórico inteiro a cada ciclo. Pagina em
         blocos de 200 até a resposta vir vazia.
         """
-        import datetime
-
         hoje = datetime.date.today()
         inicio = (hoje - datetime.timedelta(days=dias_janela)).isoformat()
         fim = (hoje + datetime.timedelta(days=30)).isoformat()
@@ -76,3 +75,53 @@ class ControllrClient:
                 break
             start += limite
         return faturas
+
+    def buscar_chamados(self, dias_janela: int = 7, timeout: float = 30.0) -> list[dict]:
+        """Chamados com atividade (ticket_date_last) nos últimos `dias_janela`
+        dias — evita puxar o histórico inteiro (~1800 chamados) a cada ciclo;
+        um chamado só entra na janela de novo se algo mexer nele. Pagina em
+        blocos de 200.
+        """
+        corte = (datetime.date.today() - datetime.timedelta(days=dias_janela)).isoformat()
+        where = json.dumps([{"field": "ticket_date_last", "oper": _OPER_GTE, "value": corte}])
+
+        chamados: list[dict] = []
+        start = 0
+        limite = 200
+        while True:
+            resp = self._sessao.post(
+                self._base_url + "support_ctl/ticket/list",
+                data={"action": "list", "where": where, "start": start, "limit": limite},
+                timeout=timeout,
+            )
+            resp.raise_for_status()
+            corpo = resp.json()
+            if not corpo.get("success"):
+                raise RuntimeError(f"Busca de chamados falhou: {corpo}")
+            pagina = corpo.get("results") or []
+            chamados.extend(pagina)
+            if len(pagina) < limite:
+                break
+            start += limite
+        return chamados
+
+    def ultimo_op_e_de_staff(self, ticket_pk: int, timeout: float = 15.0) -> bool:
+        """True só se a operação mais recente do chamado foi escrita pela
+        equipe (op_client=False) — evita notificar o cliente sobre a própria
+        mensagem que ele acabou de mandar pelo app.
+        """
+        where = json.dumps([{"field": "ticket_pk", "oper": 5, "value": ticket_pk}])
+        resp = self._sessao.post(
+            self._base_url + "support_ctl/op/list",
+            data={"where": where},
+            timeout=timeout,
+        )
+        resp.raise_for_status()
+        corpo = resp.json()
+        if not corpo.get("success"):
+            raise RuntimeError(f"Busca de operações do chamado {ticket_pk} falhou: {corpo}")
+        operacoes = corpo.get("results") or []
+        if not operacoes:
+            return False
+        ultima = max(operacoes, key=lambda op: op.get("op_pk") or 0)
+        return ultima.get("op_client") is False
