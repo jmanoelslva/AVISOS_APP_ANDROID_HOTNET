@@ -285,8 +285,11 @@ Pra mudar o intervalo (padrão 10min): edite `OnUnitActiveSec` em
 `config.json`/`service-account.json`: nunca versionados no git,
 permissão `600`.
 
-**Status**: piloto — só confirmação de pagamento. Lado do Controllr
-(login admin, busca em lote, campos usados) já validado contra produção;
-falta só validar o push chegando de fato no aparelho depois do deploy.
-Chamado de suporte atualizado e reforço de fatura em atraso ficam de
-fora até esse validar bem em produção.
+**Status**: piloto — só confirmação de pagamento. Validado de ponta a
+ponta contra produção: login admin, busca em lote (11204 faturas),
+gravação de baseline sem notificar, e envio real via FCM (Firebase
+aceitou a mensagem, topic de teste com CPF sintético — zero risco de
+notificar cliente real). Falta só confirmar que o push chega e aparece
+certo no aparelho, depois que a atualização do app for instalada num
+device de verdade. Chamado de suporte atualizado e reforço de fatura em
+atraso ficam de fora até esse validar bem em produção.
