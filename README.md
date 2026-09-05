@@ -32,13 +32,26 @@ já dentro, se já tiver gerado) pro servidor Debian, e rode como root:
 O script:
 - instala as dependências do sistema (`python3-venv`);
 - cria o usuário de sistema `aviso-broadcaster` (sem shell/login);
-- copia os arquivos pra `/opt/aviso-broadcaster` e cria o ambiente
-  virtual Python com as dependências;
+- copia os arquivos pra `/opt/aviso-broadcaster` (painel **e** poller) e
+  cria o ambiente virtual Python com as dependências;
 - **pergunta o usuário e a senha** de acesso ao painel (a senha exige
   mínimo 8 caracteres, maiúscula, minúscula, número e caractere
   especial — o script já valida antes de aceitar);
 - pergunta a porta do painel (padrão 8765);
-- instala e inicia o serviço systemd.
+- instala e inicia o serviço systemd do painel;
+- **pergunta se quer configurar o poller de eventos por conta** (opcional
+  — pagamento confirmado, chamado atualizado, fatura atrasada, ver
+  seção 9): se sim, pede a URL/usuário/senha do admin dedicado do
+  Controllr, roda a primeira execução (baseline, não notifica ninguém)
+  e só instala o timer systemd se essa execução funcionar. Se der
+  errado (URL/credencial erradas), o script avisa e não instala o
+  timer, sem travar o resto da instalação.
+
+Se copiar a pasta inteira do repo (recomendado — inclui `install.sh` e
+todos os arquivos que ele espera), não copie `config.json`,
+`controllr_config.json`, `poller_state.json` ou `acessos.log` de uma
+instalação/máquina de teste antiga — são estado local de cada instância,
+não fazem parte do código.
 
 Ao final, ele mostra o endereço do painel e o usuário criado.
 
@@ -267,6 +280,15 @@ Nunca é o CPF cru — evita expor PII no nome do tópico.
 
 ### Configuração
 
+**Instalação nova, do zero, num servidor**: o `./install.sh` (seção 2)
+já pergunta interativamente se você quer configurar o poller e faz tudo
+sozinho — URL/usuário/senha do Controllr, primeira execução (baseline)
+e instalação do timer, só se a baseline funcionar. Não precisa dos
+passos manuais abaixo nesse caso.
+
+**Instalação já existente** (painel já rodando, poller sendo adicionado
+depois, ou reconfiguração manual): siga os passos abaixo.
+
 **Sempre rode `poller.py` pelo Python do virtualenv, nunca o `python`/
 `python3` do sistema**: `/opt/aviso-broadcaster/venv/bin/python
 poller.py` (mesmo binário que `controllr-poller.service` usa). `python3`
@@ -324,30 +346,30 @@ outra já usa precisa da própria checagem, senão repete o bug já
 corrigido aqui duas vezes: tudo que já está "ativo" na janela pareceria
 novo e notificaria em massa na primeira vez que aquela categoria rodar.
 
-## 10. Deploy no servidor de produção — o que o `install.sh` cobre (e o que não cobre)
+## 10. Instalação nova num servidor diferente — `install.sh` resolve tudo
 
-O `install.sh` **não sabe nada sobre o poller** — ele só instala o painel
-web (app.py, templates, Firebase). Isso foi deliberado: o poller foi
-tratado como piloto separado, sem arriscar mexer no instalador que já
-funciona. Rodar só `./install.sh` (ou os passos de atualização da seção
-6) deixa o painel de avisos gerais em dia, mas **não** instala nem
-ativa o poller — isso é sempre manual, seção 9 acima.
+Pra reinstalar do zero (servidor novo, ex: trocar de provedor/VPS):
+copie a pasta inteira do repo (com `service-account.json` já dentro, se
+tiver) e rode `./install.sh` como root — ele cobre painel **e** poller
+numa passada só (ver seção 2). Não precisa de nenhum passo manual desta
+seção nem da seção 9 nesse caso; o script já pergunta tudo
+interativamente e só ativa o timer do poller se a primeira execução
+(baseline) funcionar.
 
-Passo a passo completo pra colocar TUDO em produção (painel atualizado
-+ poller):
+**Isso só vale pra instalação nova.** Rodar `install.sh` de novo por
+cima de uma instalação já existente não é suportado (ele não tem lógica
+de "atualizar" — recriaria o usuário admin do painel do zero). Pra
+atualizar uma instalação existente com as mudanças mais recentes de
+código (painel + poller), sem afetar configuração/dados já salvos, siga
+a seção 6 (atualização do painel) e, se o poller ainda não estiver
+instalado nela, os passos manuais da seção 9.
 
-1. No servidor: `systemctl stop aviso-broadcaster`, copiar os arquivos
-   atualizados por cima (seção 6 — inclui `fcm_sender.py` novo, com
-   `enviar_para_conta()`), `pip install -r requirements.txt` (pega o
-   `requests` novo), `systemctl start aviso-broadcaster`. Isso sozinho
-   já é seguro: `enviar_para_conta()` só é chamada pelo poller, que
-   ainda não existe no servidor nesse ponto.
-2. Copiar também os arquivos do poller pra `/opt/aviso-broadcaster/`:
-   `controllr_client.py`, `controllr_config.py`, `poller.py`,
-   `state_store.py` (não precisam de systemd ainda).
-3. Seguir a seção 9 inteira: criar `controllr_config.json`, rodar
-   `venv/bin/python poller.py` manualmente (baseline), conferir Logs, só
-   depois instalar `controllr-poller.service`/`.timer`.
+**Atenção ao copiar a pasta inteira** (de um clone git limpo, não de
+outra instalação/máquina de teste): não devem ir junto `config.json`,
+`controllr_config.json`, `poller_state.json` nem `acessos.log` — são
+estado de uma instância específica, `install.sh` cria os que precisar
+do zero. Um clone git novo (`git clone` direto do repo) nunca tem esses
+arquivos, então copiar a partir dele é sempre seguro.
 
 ## 11. Como desativar o piloto de push por conta (registro de reversão)
 

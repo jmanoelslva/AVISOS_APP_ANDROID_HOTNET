@@ -13,10 +13,14 @@ fi
 INSTALL_DIR="/opt/aviso-broadcaster"
 SERVICE_USER="aviso-broadcaster"
 SERVICE_FILE="/etc/systemd/system/aviso-broadcaster.service"
+POLLER_SERVICE_FILE="/etc/systemd/system/controllr-poller.service"
+POLLER_TIMER_FILE="/etc/systemd/system/controllr-poller.timer"
 
 echo "Isso vai remover:"
 echo "  - o serviço systemd aviso-broadcaster"
-echo "  - a pasta $INSTALL_DIR (config.json e service-account.json incluídos)"
+echo "  - o timer/serviço do poller (controllr-poller), se instalado"
+echo "  - a pasta $INSTALL_DIR (config.json, service-account.json e"
+echo "    controllr_config.json incluídos)"
 echo "  - o usuário de sistema $SERVICE_USER"
 echo ""
 read -rp "Confirma a desinstalação completa? [s/N] " CONFIRMA
@@ -34,6 +38,18 @@ fi
 if [[ -f "$SERVICE_FILE" ]]; then
     echo "== Removendo unidade systemd =="
     rm -f "$SERVICE_FILE"
+    systemctl daemon-reload
+fi
+
+if systemctl list-unit-files | grep -q "^controllr-poller.timer"; then
+    echo "== Parando e desabilitando o poller =="
+    systemctl stop controllr-poller.timer 2>/dev/null || true
+    systemctl disable controllr-poller.timer 2>/dev/null || true
+fi
+
+if [[ -f "$POLLER_SERVICE_FILE" || -f "$POLLER_TIMER_FILE" ]]; then
+    echo "== Removendo unidades systemd do poller =="
+    rm -f "$POLLER_SERVICE_FILE" "$POLLER_TIMER_FILE"
     systemctl daemon-reload
 fi
 
