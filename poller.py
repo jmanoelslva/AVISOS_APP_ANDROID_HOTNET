@@ -63,6 +63,7 @@ def processar_pagamentos(faturas: list[dict], estado: dict, primeira_vez: bool) 
                             "invoice_pk": pk,
                             "contract_number": fatura.get("contract_number") or "",
                             "invoice_amount_document": fatura.get("invoice_amount_document") or "",
+                            "invoice_date_due": fatura.get("invoice_date_due") or "",
                         },
                     )
                     notificadas += 1
