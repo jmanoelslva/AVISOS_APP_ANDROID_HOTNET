@@ -1,10 +1,8 @@
-"""Ponto de entrada do poller (pagamento confirmado + chamado atualizado) —
-roda uma vez e sai (chamado por systemd timer, ver controllr-poller.timer).
-Sem loop/scheduler interno de propósito: mantém o processo simples e sem
-estado entre execuções além do que já está em poller_state.json.
-
-Reforço de fatura em atraso fica de fora por enquanto, se os dois casos
-acima validarem bem em produção.
+"""Ponto de entrada do poller (pagamento confirmado + reforço de atraso +
+chamado atualizado) — roda uma vez e sai (chamado por systemd timer, ver
+controllr-poller.timer). Sem loop/scheduler interno de propósito: mantém
+o processo simples e sem estado entre execuções além do que já está em
+poller_state.json.
 """
 import hashlib
 import re
@@ -28,10 +26,18 @@ def topico_conta_cpf(cpf: str) -> str:
     return "conta_" + hashlib.sha256(digitos.encode("utf-8")).hexdigest()[:16]
 
 
-def processar_faturas(cliente: ControllrClient, estado: dict, primeira_vez_faturas: bool) -> tuple[int, int]:
-    faturas_vistas = estado.setdefault("faturas", {})
-    faturas = cliente.buscar_faturas()
+def _fatura_vale_notificar(fatura: dict) -> bool:
+    """Filtra faturas que o endpoint admin devolve mas não representam uma
+    cobrança real em aberto pro cliente: `invoice_deleted` é claramente uma
+    exclusão lógica; `invoice_valid=False` não é documentado, mas em toda
+    amostra observada correlacionou com `client_status=0` (cliente inativo/
+    cancelado) — inferido, não confirmado contra documentação oficial.
+    """
+    return not fatura.get("invoice_deleted") and fatura.get("invoice_valid") is not False
 
+
+def processar_pagamentos(faturas: list[dict], estado: dict, primeira_vez: bool) -> int:
+    faturas_vistas = estado.setdefault("faturas", {})
     notificadas = 0
     for fatura in faturas:
         pk = str(fatura.get("invoice_pk"))
@@ -42,7 +48,7 @@ def processar_faturas(cliente: ControllrClient, estado: dict, primeira_vez_fatur
         # quem já foi visto pago (evita reenviar todo ciclo), e nunca na
         # primeira execução (CRÍTICO: sem estado prévio, toda fatura já paga
         # dentro da janela pareceria "nova" e notificaria milhares de uma vez).
-        if credito_atual and not credito_anterior and not primeira_vez_faturas:
+        if credito_atual and not credito_anterior and not primeira_vez and _fatura_vale_notificar(fatura):
             cpf = fatura.get("client_doc1") or ""
             if cpf:
                 try:
@@ -61,7 +67,51 @@ def processar_faturas(cliente: ControllrClient, estado: dict, primeira_vez_fatur
 
         faturas_vistas[pk] = credito_atual
 
-    return len(faturas), notificadas
+    return notificadas
+
+
+def processar_atrasos(faturas: list[dict], estado: dict, primeira_vez: bool) -> int:
+    """Reforço de atraso — um empurrão único quando a fatura vira atrasada
+    (`invoice_late`), não um lembrete repetido enquanto ela continuar assim.
+    Reaproveita a mesma lista de `buscar_faturas()` do pagamento confirmado
+    (mesma janela de 90 dias já cobre faturas vencidas), sem chamada extra.
+    """
+    atrasadas_vistas = estado.setdefault("faturas_atrasadas", {})
+    notificadas = 0
+    for fatura in faturas:
+        pk = str(fatura.get("invoice_pk"))
+        ja_notificada = atrasadas_vistas.get(pk, False)
+
+        if (
+            fatura.get("invoice_late")
+            and not fatura.get("invoice_date_credit")
+            and not ja_notificada
+            and not primeira_vez
+            and _fatura_vale_notificar(fatura)
+        ):
+            cpf = fatura.get("client_doc1") or ""
+            if cpf:
+                try:
+                    enviar_para_conta(
+                        topico_conta_cpf(cpf),
+                        "fatura_atrasada",
+                        {
+                            "invoice_pk": pk,
+                            "contract_number": fatura.get("contract_number") or "",
+                            "invoice_amount_document": fatura.get("invoice_amount_document") or "",
+                            "invoice_date_due": fatura.get("invoice_date_due") or "",
+                        },
+                    )
+                    notificadas += 1
+                    atrasadas_vistas[pk] = True
+                except Exception as e:
+                    access_log.registrar("poller_falha", detalhes=f"envio atraso fatura {pk}: {e}")
+        elif fatura.get("invoice_late"):
+            # Já notificado antes (ou baseline) — só garante que fica marcado,
+            # sem reenviar.
+            atrasadas_vistas.setdefault(pk, True)
+
+    return notificadas
 
 
 def processar_chamados(cliente: ControllrClient, estado: dict, primeira_vez_chamados: bool) -> tuple[int, int]:
@@ -110,12 +160,12 @@ def main() -> int:
         return 1
 
     estado = state_store.carregar()
-    # Por categoria, não pelo arquivo inteiro — "faturas" pode já ter
-    # baseline de um piloto anterior enquanto "chamados" ainda não tem
-    # nenhuma (é exatamente esse caso hoje). Cada categoria nova adicionada
-    # aqui precisa da própria checagem, senão repete o mesmo bug: tudo que
-    # já está "ativo" na janela pareceria novo e notificaria em massa.
-    primeira_vez_faturas = "faturas" not in estado
+    # Por categoria, não pelo arquivo inteiro — cada categoria nova adicionada
+    # aqui precisa da própria checagem, senão repete o mesmo bug já corrigido
+    # duas vezes: tudo que já está "ativo" na janela pareceria novo e
+    # notificaria em massa na primeira vez que aquela categoria rodar.
+    primeira_vez_pagamentos = "faturas" not in estado
+    primeira_vez_atrasos = "faturas_atrasadas" not in estado
     primeira_vez_chamados = "chamados" not in estado
 
     cliente = ControllrClient(cfg["base_url"], cfg["usuario"], cfg["senha"])
@@ -127,11 +177,14 @@ def main() -> int:
         return 1
 
     try:
-        total_faturas, notif_faturas = processar_faturas(cliente, estado, primeira_vez_faturas)
+        faturas = cliente.buscar_faturas()
     except Exception as e:
         access_log.registrar("poller_falha", detalhes=f"busca de faturas: {e}")
         print(f"Falha ao consultar faturas: {e}", file=sys.stderr)
         return 1
+
+    notif_pagamentos = processar_pagamentos(faturas, estado, primeira_vez_pagamentos)
+    notif_atrasos = processar_atrasos(faturas, estado, primeira_vez_atrasos)
 
     try:
         total_chamados, notif_chamados = processar_chamados(cliente, estado, primeira_vez_chamados)
@@ -143,8 +196,12 @@ def main() -> int:
     state_store.salvar(estado)
     partes = []
     partes.append(
-        f"{total_faturas} faturas, baseline gravada" if primeira_vez_faturas
-        else f"{total_faturas} faturas ({notif_faturas} notificadas)"
+        f"{len(faturas)} faturas, baseline pagamento gravada" if primeira_vez_pagamentos
+        else f"{len(faturas)} faturas ({notif_pagamentos} pagamentos notificados)"
+    )
+    partes.append(
+        "baseline atraso gravada" if primeira_vez_atrasos
+        else f"{notif_atrasos} atrasos notificados"
     )
     partes.append(
         f"{total_chamados} chamados, baseline gravada" if primeira_vez_chamados
