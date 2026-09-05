@@ -266,10 +266,14 @@ real, nunca de novo pra quem já foi notificado:
   repete todo ciclo enquanto continuar atrasada), lembrando do prazo de
   bloqueio do fornecimento (vencimento + 7 dias corridos).
 
-Faturas com `invoice_deleted=true` (excluída/substituída) ou
-`invoice_valid=false` (não documentado — em toda amostra observada
-correlacionou com cliente inativo/cancelado) são ignoradas nos dois
-eventos de fatura, senão notificaria sobre cobrança que não vale mais.
+Faturas com `invoice_deleted=true` (excluída/substituída) são ignoradas
+nos dois eventos de fatura, senão notificaria sobre cobrança que não
+vale mais. **`invoice_valid=false` NÃO entra nesse filtro** — parecia
+correlacionar com cliente inativo/cancelado numa amostra pequena, mas o
+usuário confirmou o significado real: pagamento feito manualmente no
+escritório, fora da plataforma bancária (não indica nada sobre o
+cliente). Chegou a bloquear por engano uma notificação de pagamento
+real feito assim — corrigido.
 
 ### Como identifica a conta
 

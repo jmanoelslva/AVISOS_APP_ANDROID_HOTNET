@@ -27,13 +27,17 @@ def topico_conta_cpf(cpf: str) -> str:
 
 
 def _fatura_vale_notificar(fatura: dict) -> bool:
-    """Filtra faturas que o endpoint admin devolve mas não representam uma
-    cobrança real em aberto pro cliente: `invoice_deleted` é claramente uma
-    exclusão lógica; `invoice_valid=False` não é documentado, mas em toda
-    amostra observada correlacionou com `client_status=0` (cliente inativo/
-    cancelado) — inferido, não confirmado contra documentação oficial.
+    """Filtra só `invoice_deleted` (exclusão lógica clara do registro).
+
+    `invoice_valid=False` NÃO significa cliente inativo/cancelado, como se
+    supôs numa rodada anterior — confirmado pelo usuário: significa que o
+    pagamento foi feito manualmente no escritório, fora da plataforma
+    bancária (o valor/data reais continuam em `invoice_amount_paid`/
+    `invoice_date_credit`, normalmente). Chegou a filtrar erroneamente um
+    pagamento real feito assim, sem notificar o cliente — por isso não é
+    mais usado como filtro aqui.
     """
-    return not fatura.get("invoice_deleted") and fatura.get("invoice_valid") is not False
+    return not fatura.get("invoice_deleted")
 
 
 def processar_pagamentos(faturas: list[dict], estado: dict, primeira_vez: bool) -> int:
