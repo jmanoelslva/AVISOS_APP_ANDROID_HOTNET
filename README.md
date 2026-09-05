@@ -252,8 +252,9 @@ pra todo mundo. Não altera nada no Controllr, só lê (`invoice_ctl/invoice/lis
 **Por que existe**: o Controllr não tem webhook/push próprio, então "em
 tempo real" aqui significa "checagem periódica" (a cada 10min, por
 padrão) — o poller guarda o que já viu em `poller_state.json`, por
-categoria (`faturas`/`chamados`), e só notifica em cima de uma transição
-real, nunca de novo pra quem já foi notificado:
+categoria (`faturas`/`faturas_atrasadas`/`faturas_vence_amanha`/
+`chamados`), e só notifica em cima de uma transição real, nunca de novo
+pra quem já foi notificado:
 
 - **Pagamento confirmado**: `invoice_date_credit` passa de vazio pra
   preenchido.
@@ -265,9 +266,14 @@ real, nunca de novo pra quem já foi notificado:
 - **Fatura atrasada**: `invoice_late` vira `true` — empurrão único (não
   repete todo ciclo enquanto continuar atrasada), lembrando do prazo de
   bloqueio do fornecimento (vencimento + 7 dias corridos).
+- **Boleto vence amanhã**: `invoice_date_due` é amanhã e a fatura ainda
+  não foi paga — empurrão único. Substitui por completo o antigo
+  `VencimentoWorker` (WorkManager no app, removido) — mesma ação
+  "Copiar código Pix" preservada (`invoice_qrcode` vai no payload como
+  `pix_code`).
 
 Faturas com `invoice_deleted=true` (excluída/substituída) são ignoradas
-nos dois eventos de fatura, senão notificaria sobre cobrança que não
+nos três eventos de fatura, senão notificaria sobre cobrança que não
 vale mais. **`invoice_valid=false` NÃO entra nesse filtro** — parecia
 correlacionar com cliente inativo/cancelado numa amostra pequena, mas o
 usuário confirmou o significado real: pagamento feito manualmente no
@@ -336,19 +342,19 @@ Pra mudar o intervalo (padrão 10min): edite `OnUnitActiveSec` em
 `config.json`/`service-account.json`: nunca versionados no git,
 permissão `600`.
 
-**Status**: piloto — os 3 eventos (pagamento confirmado, chamado
-atualizado, fatura atrasada) validados de ponta a ponta em produção
-(login admin, busca em lote, baseline gravada por categoria sem
-notificar, envio real via FCM e recebimento confirmado num aparelho de
-teste, com o app aberto e fechado, textos finais aprovados).
+**Status**: os 4 eventos (pagamento confirmado, chamado atualizado,
+fatura atrasada, boleto vence amanhã) rodando em produção. O 4º
+substituiu por completo o antigo lembrete local do app (`VencimentoWorker`,
+removido) — não é mais um recurso separado, é o mesmo poller.
 
 **Importante ao adicionar uma categoria nova**: a checagem de "primeira
 execução" em `main()` (`poller.py`) é por categoria (`"faturas"`,
-`"faturas_atrasadas"`, `"chamados"` — `not in estado`), não pelo arquivo
-inteiro — uma categoria nova populando o mesmo `poller_state.json` que
-outra já usa precisa da própria checagem, senão repete o bug já
-corrigido aqui duas vezes: tudo que já está "ativo" na janela pareceria
-novo e notificaria em massa na primeira vez que aquela categoria rodar.
+`"faturas_atrasadas"`, `"faturas_vence_amanha"`, `"chamados"` — `not in
+estado`), não pelo arquivo inteiro — uma categoria nova populando o
+mesmo `poller_state.json` que outra já usa precisa da própria checagem,
+senão repete o bug já corrigido aqui duas vezes: tudo que já está
+"ativo" na janela pareceria novo e notificaria em massa na primeira vez
+que aquela categoria rodar.
 
 ## 10. Instalação nova num servidor diferente — `install.sh` resolve tudo
 
@@ -377,22 +383,31 @@ arquivos, então copiar a partir dele é sempre seguro.
 
 ## 11. Como desativar o piloto de push por conta (registro de reversão)
 
-Caso decida abandonar os 3 eventos por conta (pagamento, chamado,
-atraso) e não seguir com essa automação:
+**Atualizado 2026-09-05 — leia isto antes de desativar**: diferente de
+quando essa seção foi escrita pela primeira vez, o poller **já está em
+produção** e o 4º evento (boleto vence amanhã) **substituiu** o antigo
+`VencimentoWorker` local — esse Worker foi removido do app, não existe
+mais como alternativa. Ou seja, desativar o poller agora significa
+também perder o lembrete de "vence amanhã" por completo, não só voltar
+pro estado local — não tem mais fallback automático nesse aviso
+específico.
 
-- **Se o poller nunca chegou a ser instalado no servidor** (estado até
-  2026-09-04, todo teste rodou a partir de uma máquina de dev): não
-  precisa fazer nada — simplesmente não execute os passos da seção 9/10.
-  O painel web (`avisos_gerais`, Modelos) continua funcionando
-  normalmente, sem nenhuma dependência do poller.
-- **Se o poller já está rodando**: `systemctl disable --now
-  controllr-poller.timer` — já para 100% dos pushes por conta na hora,
-  sem tocar em mais nada. Pra limpar de vez: remover
-  `/etc/systemd/system/controllr-poller.timer`/`.service`,
-  `controllr_config.json` e `poller_state.json` do servidor.
-- **Reversão do código** (opcional, só se quiser tirar do histórico):
+- **Parar tudo rápido**: `systemctl disable --now
+  controllr-poller.timer` no servidor — para os 4 eventos na hora, sem
+  tocar em mais nada. O painel web (`avisos_gerais`, Modelos) continua
+  funcionando normalmente, sem nenhuma dependência do poller. Pra
+  limpar de vez: remover `/etc/systemd/system/controllr-poller.timer`/
+  `.service`, `controllr_config.json` e `poller_state.json` do
+  servidor.
+- **Reversão parcial** (só o boleto vence amanhã, mantendo os outros 3
+  eventos): reverter só o commit que fez essa migração (app:
+  `0e958ed`; painel: o commit que adicionou `processar_vence_amanha()`
+  em `poller.py`) — isso restaura o `VencimentoWorker` local, mas exige
+  reinstalar a build antiga do app em todo mundo, não é uma operação
+  "só servidor".
+- **Reversão completa do código** (tira o piloto inteiro do histórico):
   `git revert` dos commits `511dff1`, `aafc78b`, `9f3fc35`, `d17298b`,
-  `7efc461` neste repo, e `a076e19`/`cd90797`/`45bd4e4` no repo do app
-  Android. Não é necessário pro piloto ficar "desligado" — só o timer
-  parado já resolve, porque o app só reage a mensagens que o poller
-  para de mandar.
+  `7efc461`, `8da1662`, `c40f361` neste repo, e
+  `a076e19`/`cd90797`/`45bd4e4`/`e182c9f`/`0e958ed` no repo do app
+  Android — nessa ordem inclui a remoção do `VencimentoWorker`, então
+  reverter tudo restaura o comportamento local original.

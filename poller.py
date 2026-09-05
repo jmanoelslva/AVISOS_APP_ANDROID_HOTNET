@@ -1,9 +1,14 @@
 """Ponto de entrada do poller (pagamento confirmado + reforço de atraso +
-chamado atualizado) — roda uma vez e sai (chamado por systemd timer, ver
-controllr-poller.timer). Sem loop/scheduler interno de propósito: mantém
-o processo simples e sem estado entre execuções além do que já está em
-poller_state.json.
+boleto vence amanhã + chamado atualizado) — roda uma vez e sai (chamado
+por systemd timer, ver controllr-poller.timer). Sem loop/scheduler
+interno de propósito: mantém o processo simples e sem estado entre
+execuções além do que já está em poller_state.json.
+
+"Boleto vence amanhã" substitui o antigo lembrete local do app
+(VencimentoWorker, removido) — mais confiável, não depende do WorkManager
+acordar sozinho no aparelho.
 """
+import datetime
 import hashlib
 import re
 import sys
@@ -123,6 +128,52 @@ def processar_atrasos(faturas: list[dict], estado: dict, primeira_vez: bool) -> 
     return notificadas
 
 
+def processar_vence_amanha(faturas: list[dict], estado: dict, primeira_vez: bool) -> int:
+    """Substitui o antigo lembrete local (VencimentoWorker, WorkManager no
+    aparelho) — rodava só 1x/dia e dependia do Android acordar o job sozinho
+    (Doze/otimização de bateria). Aqui, mesma lista de buscar_faturas() dos
+    outros dois eventos de fatura, empurrão único por invoice_pk.
+    """
+    hoje = datetime.date.today()
+    amanha_iso = (hoje + datetime.timedelta(days=1)).isoformat()
+
+    vistas = estado.setdefault("faturas_vence_amanha", {})
+    notificadas = 0
+    for fatura in faturas:
+        pk = str(fatura.get("invoice_pk"))
+        ja_notificada = vistas.get(pk, False)
+        vence_amanha = (fatura.get("invoice_date_due") or "").startswith(amanha_iso)
+
+        if (
+            vence_amanha
+            and not fatura.get("invoice_date_credit")
+            and not ja_notificada
+            and not primeira_vez
+            and _fatura_vale_notificar(fatura)
+        ):
+            cpf = fatura.get("client_doc1") or ""
+            if cpf:
+                try:
+                    enviar_para_conta(
+                        topico_conta_cpf(cpf),
+                        "boleto_vence_amanha",
+                        {
+                            "invoice_pk": pk,
+                            "contract_number": fatura.get("contract_number") or "",
+                            "invoice_amount_document": fatura.get("invoice_amount_document") or "",
+                            "pix_code": fatura.get("invoice_qrcode") or "",
+                        },
+                    )
+                    notificadas += 1
+                    vistas[pk] = True
+                except Exception as e:
+                    access_log.registrar("poller_falha", detalhes=f"envio vence-amanhã fatura {pk}: {e}")
+        elif vence_amanha:
+            vistas.setdefault(pk, True)
+
+    return notificadas
+
+
 def processar_chamados(cliente: ControllrClient, estado: dict, primeira_vez_chamados: bool) -> tuple[int, int]:
     chamados_vistos = estado.setdefault("chamados", {})
     chamados = cliente.buscar_chamados()
@@ -175,6 +226,7 @@ def main() -> int:
     # notificaria em massa na primeira vez que aquela categoria rodar.
     primeira_vez_pagamentos = "faturas" not in estado
     primeira_vez_atrasos = "faturas_atrasadas" not in estado
+    primeira_vez_vence_amanha = "faturas_vence_amanha" not in estado
     primeira_vez_chamados = "chamados" not in estado
 
     cliente = ControllrClient(cfg["base_url"], cfg["usuario"], cfg["senha"])
@@ -194,6 +246,7 @@ def main() -> int:
 
     notif_pagamentos = processar_pagamentos(faturas, estado, primeira_vez_pagamentos)
     notif_atrasos = processar_atrasos(faturas, estado, primeira_vez_atrasos)
+    notif_vence_amanha = processar_vence_amanha(faturas, estado, primeira_vez_vence_amanha)
 
     try:
         total_chamados, notif_chamados = processar_chamados(cliente, estado, primeira_vez_chamados)
@@ -211,6 +264,10 @@ def main() -> int:
     partes.append(
         "baseline atraso gravada" if primeira_vez_atrasos
         else f"{notif_atrasos} atrasos notificados"
+    )
+    partes.append(
+        "baseline vence-amanhã gravada" if primeira_vez_vence_amanha
+        else f"{notif_vence_amanha} vence-amanhã notificados"
     )
     partes.append(
         f"{total_chamados} chamados, baseline gravada" if primeira_vez_chamados
