@@ -249,6 +249,14 @@ real, nunca de novo pra quem já foi notificado:
   (`op_client=False`) — se foi o próprio cliente quem mexeu por último
   (respondeu pelo app), não notifica, senão seria um aviso sobre a
   própria ação da pessoa.
+- **Fatura atrasada**: `invoice_late` vira `true` — empurrão único (não
+  repete todo ciclo enquanto continuar atrasada), lembrando do prazo de
+  bloqueio do fornecimento (vencimento + 7 dias corridos).
+
+Faturas com `invoice_deleted=true` (excluída/substituída) ou
+`invoice_valid=false` (não documentado — em toda amostra observada
+correlacionou com cliente inativo/cancelado) são ignoradas nos dois
+eventos de fatura, senão notificaria sobre cobrança que não vale mais.
 
 ### Como identifica a conta
 
@@ -293,16 +301,63 @@ Pra mudar o intervalo (padrão 10min): edite `OnUnitActiveSec` em
 `config.json`/`service-account.json`: nunca versionados no git,
 permissão `600`.
 
-**Status**: piloto — pagamento confirmado e chamado atualizado, os dois
-validados de ponta a ponta em produção (login admin, busca em lote,
-baseline gravada por categoria sem notificar, envio real via FCM e
-recebimento confirmado num aparelho de teste, com o app aberto e
-fechado). Reforço de fatura em atraso fica de fora por enquanto.
+**Status**: piloto — os 3 eventos (pagamento confirmado, chamado
+atualizado, fatura atrasada) validados de ponta a ponta em produção
+(login admin, busca em lote, baseline gravada por categoria sem
+notificar, envio real via FCM e recebimento confirmado num aparelho de
+teste, com o app aberto e fechado, textos finais aprovados).
 
 **Importante ao adicionar uma categoria nova**: a checagem de "primeira
-execução" em `main()` (`poller.py`) é por categoria (`"faturas" not in
-estado`, `"chamados" not in estado`), não pelo arquivo inteiro — uma
-categoria nova populando o mesmo `poller_state.json` que outra já usa
-precisa da própria checagem, senão repete o bug já corrigido aqui uma
-vez: tudo que já está "ativo" na janela pareceria novo e notificaria em
-massa na primeira vez que aquela categoria rodar.
+execução" em `main()` (`poller.py`) é por categoria (`"faturas"`,
+`"faturas_atrasadas"`, `"chamados"` — `not in estado`), não pelo arquivo
+inteiro — uma categoria nova populando o mesmo `poller_state.json` que
+outra já usa precisa da própria checagem, senão repete o bug já
+corrigido aqui duas vezes: tudo que já está "ativo" na janela pareceria
+novo e notificaria em massa na primeira vez que aquela categoria rodar.
+
+## 10. Deploy no servidor de produção — o que o `install.sh` cobre (e o que não cobre)
+
+O `install.sh` **não sabe nada sobre o poller** — ele só instala o painel
+web (app.py, templates, Firebase). Isso foi deliberado: o poller foi
+tratado como piloto separado, sem arriscar mexer no instalador que já
+funciona. Rodar só `./install.sh` (ou os passos de atualização da seção
+6) deixa o painel de avisos gerais em dia, mas **não** instala nem
+ativa o poller — isso é sempre manual, seção 9 acima.
+
+Passo a passo completo pra colocar TUDO em produção (painel atualizado
++ poller):
+
+1. No servidor: `systemctl stop aviso-broadcaster`, copiar os arquivos
+   atualizados por cima (seção 6 — inclui `fcm_sender.py` novo, com
+   `enviar_para_conta()`), `pip install -r requirements.txt` (pega o
+   `requests` novo), `systemctl start aviso-broadcaster`. Isso sozinho
+   já é seguro: `enviar_para_conta()` só é chamada pelo poller, que
+   ainda não existe no servidor nesse ponto.
+2. Copiar também os arquivos do poller pra `/opt/aviso-broadcaster/`:
+   `controllr_client.py`, `controllr_config.py`, `poller.py`,
+   `state_store.py` (não precisam de systemd ainda).
+3. Seguir a seção 9 inteira: criar `controllr_config.json`, rodar
+   `python poller.py` manualmente (baseline), conferir Logs, só depois
+   instalar `controllr-poller.service`/`.timer`.
+
+## 11. Como desativar o piloto de push por conta (registro de reversão)
+
+Caso decida abandonar os 3 eventos por conta (pagamento, chamado,
+atraso) e não seguir com essa automação:
+
+- **Se o poller nunca chegou a ser instalado no servidor** (estado até
+  2026-09-04, todo teste rodou a partir de uma máquina de dev): não
+  precisa fazer nada — simplesmente não execute os passos da seção 9/10.
+  O painel web (`avisos_gerais`, Modelos) continua funcionando
+  normalmente, sem nenhuma dependência do poller.
+- **Se o poller já está rodando**: `systemctl disable --now
+  controllr-poller.timer` — já para 100% dos pushes por conta na hora,
+  sem tocar em mais nada. Pra limpar de vez: remover
+  `/etc/systemd/system/controllr-poller.timer`/`.service`,
+  `controllr_config.json` e `poller_state.json` do servidor.
+- **Reversão do código** (opcional, só se quiser tirar do histórico):
+  `git revert` dos commits `511dff1`, `aafc78b`, `9f3fc35`, `d17298b`,
+  `7efc461` neste repo, e `a076e19`/`cd90797`/`45bd4e4` no repo do app
+  Android. Não é necessário pro piloto ficar "desligado" — só o timer
+  parado já resolve, porque o app só reage a mensagens que o poller
+  para de mandar.
