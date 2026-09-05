@@ -267,19 +267,28 @@ Nunca é o CPF cru — evita expor PII no nome do tópico.
 
 ### Configuração
 
+**Sempre rode `poller.py` pelo Python do virtualenv, nunca o `python`/
+`python3` do sistema**: `/opt/aviso-broadcaster/venv/bin/python
+poller.py` (mesmo binário que `controllr-poller.service` usa). `python3`
+do sistema não tem `requests`/`firebase-admin` instalados (só o venv
+tem, via `pip install -r requirements.txt`); em muitos Debian, `python`
+sem mais nada aponta pro Python 2, que nem entende o arquivo (erro de
+"Non-ASCII character... but no encoding declared").
+
 1. No Controllr, crie um usuário admin **dedicado, só leitura** pra essa
    função (não reaproveite login pessoal).
-2. Rode `python poller.py` uma vez manualmente — ele cria
-   `controllr_config.json` com um template e para, avisando o que
-   falta preencher (`base_url` da área **administrativa**, porta
-   8080/8081/8443 conforme configurado no Controllr — não é a mesma
-   porta 443 que o app Android usa; `usuario`; `senha`). Validado em
-   produção: `https://controllr.hotnet.net.br:8443/` — atenção ao
-   `.net.br`, sem ele o domínio não resolve.
-3. Preencha o arquivo e rode `python poller.py` **manualmente** de novo
-   — essa primeira execução real só grava a baseline (nenhuma
-   notificação é enviada nela, mesmo que existam milhares de faturas já
-   pagas na janela — ver comentário em `poller.py`). Confirme pela aba
+2. Rode `/opt/aviso-broadcaster/venv/bin/python poller.py` uma vez
+   manualmente — ele cria `controllr_config.json` com um template e
+   para, avisando o que falta preencher (`base_url` da área
+   **administrativa**, porta 8080/8081/8443 conforme configurado no
+   Controllr — não é a mesma porta 443 que o app Android usa; `usuario`;
+   `senha`). Validado em produção: `https://controllr.hotnet.net.br:8443/`
+   — atenção ao `.net.br`, sem ele o domínio não resolve.
+3. Preencha o arquivo e rode `/opt/aviso-broadcaster/venv/bin/python
+   poller.py` **manualmente** de novo — essa primeira execução real só
+   grava a baseline (nenhuma notificação é enviada nela, mesmo que
+   existam milhares de faturas já pagas na janela — ver comentário em
+   `poller.py`). Confirme pela aba
    Logs (`poller_ciclo`, "baseline gravada") antes de seguir.
 4. Só depois da baseline gravada, instale como serviço + timer do
    systemd:
@@ -337,8 +346,8 @@ Passo a passo completo pra colocar TUDO em produção (painel atualizado
    `controllr_client.py`, `controllr_config.py`, `poller.py`,
    `state_store.py` (não precisam de systemd ainda).
 3. Seguir a seção 9 inteira: criar `controllr_config.json`, rodar
-   `python poller.py` manualmente (baseline), conferir Logs, só depois
-   instalar `controllr-poller.service`/`.timer`.
+   `venv/bin/python poller.py` manualmente (baseline), conferir Logs, só
+   depois instalar `controllr-poller.service`/`.timer`.
 
 ## 11. Como desativar o piloto de push por conta (registro de reversão)
 
