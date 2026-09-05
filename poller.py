@@ -62,7 +62,11 @@ def processar_pagamentos(faturas: list[dict], estado: dict, primeira_vez: bool) 
                         {
                             "invoice_pk": pk,
                             "contract_number": fatura.get("contract_number") or "",
-                            "invoice_amount_document": fatura.get("invoice_amount_document") or "",
+                            # invoice_amount_paid, não invoice_amount_document: 23% das
+                            # faturas pagas na amostra têm juros/multa somados ou
+                            # desconto de pontualidade — o valor do documento original
+                            # fica errado quase 1 em cada 4 vezes.
+                            "invoice_amount_paid": fatura.get("invoice_amount_paid") or "",
                             "invoice_date_due": fatura.get("invoice_date_due") or "",
                         },
                     )
