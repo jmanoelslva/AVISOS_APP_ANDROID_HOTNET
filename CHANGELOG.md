@@ -3,6 +3,25 @@
 Todas as mudanças relevantes do painel de avisos e do poller de eventos por conta.
 Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/).
 
+## [1.2.1] - 2026-10-16
+
+### Corrigido
+- Enviar aviso: ao escolher um modelo com texto longo, a prévia "recolhida" esticava
+  a página para os lados (barra de rolagem horizontal) e desalinhava o formulário.
+- Cartões de baixo (Últimos avisos / Notificações automáticas) alinhados às colunas
+  de cima.
+
+### Alterado
+- Menu volta a ser só as abas no topo, em qualquer largura de tela (sai o menu
+  lateral do computador).
+
+### Como atualizar o servidor
+```bash
+cd /opt/aviso-broadcaster && git pull
+chown -R aviso-broadcaster: /opt/aviso-broadcaster
+systemctl restart aviso-broadcaster
+```
+
 ## [1.2.0] - 2026-10-16
 
 ### Adicionado
@@ -75,6 +94,7 @@ Estado em produção desde o piloto de push por conta.
 - Pagamento confirmado usa `invoice_amount_paid` (valor realmente pago) em vez do
   valor do documento.
 
+[1.2.1]: https://github.com/jmanoelslva/AVISOS_APP_ANDROID_HOTNET/compare/v1.2.0...v1.2.1
 [1.2.0]: https://github.com/jmanoelslva/AVISOS_APP_ANDROID_HOTNET/compare/v1.1.0...v1.2.0
 [1.1.0]: https://github.com/jmanoelslva/AVISOS_APP_ANDROID_HOTNET/compare/v1.0.0...v1.1.0
 [1.0.0]: https://github.com/jmanoelslva/AVISOS_APP_ANDROID_HOTNET/releases/tag/v1.0.0

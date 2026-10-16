@@ -473,52 +473,18 @@
         .pagina-larga main { max-width: 940px; }
         .grid-2col {
             display: grid;
-            grid-template-columns: 1.3fr 1fr;
+            grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr);
             gap: 22px;
             align-items: start;
         }
         .coluna-grid { display: flex; flex-direction: column; gap: 22px; }
         .coluna-grid .card { margin-bottom: 0; }
+        /* Itens de grade encolhem até 0: sem isso, texto de uma linha (nowrap) estica a coluna e a página vaza para os lados. */
+        .grade-envio > *, .grid-2col > *, .coluna-grid > *, .notificacao > * { min-width: 0; }
         @media (max-width: 760px) {
-            .grid-2col { grid-template-columns: 1fr; }
+            .grid-2col { grid-template-columns: minmax(0, 1fr); }
         }
-        /* ===== 1.2.0: identidade do app, menu lateral, prévia, emojis, confirmação, logs ===== */
-        .layout { display: block; }
-        .menu-lateral { display: none; }
-        @media (min-width: 900px) {
-            body.com-menu .layout {
-                display: grid;
-                grid-template-columns: 210px 1fr;
-                max-width: 1180px;
-                margin: 0 auto;
-                gap: 8px;
-            }
-            body.com-menu .menu-lateral {
-                display: flex;
-                flex-direction: column;
-                gap: 4px;
-                padding: 32px 0 0 20px;
-                position: sticky;
-                top: 0;
-                align-self: start;
-            }
-            body.com-menu header nav.abas { display: none; }
-            body.com-menu main { margin-top: 32px; }
-        }
-        .menu-lateral a {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            padding: 10px 12px;
-            border-radius: 12px;
-            color: var(--cor-texto);
-            text-decoration: none;
-            font-weight: 600;
-            font-size: 14px;
-        }
-        .menu-lateral a:hover { background: var(--cor-secundario-bg); }
-        .menu-lateral a.ativo { background: var(--cor-badge-bg); color: var(--cor-acento-texto); }
-        .menu-lateral hr { border: none; border-top: 1px solid var(--cor-borda); margin: 8px 4px; }
+        /* ===== 1.2.0: identidade do app, prévia, emojis, confirmação, logs ===== */
         .menu-usuario { position: relative; }
         .menu-usuario summary {
             list-style: none;
@@ -562,8 +528,8 @@
         .contador { font-weight: 600; text-transform: none; letter-spacing: 0; }
         .contador.perto { color: var(--cor-erro); }
         .rotulo-linha { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
-        .grade-envio { display: grid; grid-template-columns: 1.15fr 1fr; gap: 22px; align-items: start; }
-        @media (max-width: 860px) { .grade-envio { grid-template-columns: 1fr; } }
+        .grade-envio { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); gap: 22px; align-items: start; }
+        @media (max-width: 860px) { .grade-envio { grid-template-columns: minmax(0, 1fr); } }
         .pagina-envio main { max-width: 1000px; }
         .cartoes-modelo { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 8px; margin-top: 8px; }
         .cartao-modelo {
@@ -607,7 +573,7 @@
             border-radius: 16px;
             padding: 11px 12px;
             display: grid;
-            grid-template-columns: 30px 1fr;
+            grid-template-columns: 30px minmax(0, 1fr);
             gap: 10px;
             align-items: start;
         }
@@ -714,7 +680,7 @@
     </style>
 </head>
 {% set logado = session.get('autenticado') %}
-<body class="{% if request.endpoint == 'login' %}pagina-login{% elif request.endpoint in ('configuracoes', 'logs') %}pagina-larga{% elif request.endpoint == 'dashboard' %}pagina-envio{% endif %}{% if logado %} com-menu{% endif %}">
+<body class="{% if request.endpoint == 'login' %}pagina-login{% elif request.endpoint in ('configuracoes', 'logs') %}pagina-larga{% elif request.endpoint == 'dashboard' %}pagina-envio{% endif %}">
     <header>
         <div class="marca">
             <div class="marca-icone">📣</div>
@@ -725,7 +691,6 @@
         </div>
         <div class="header-direita">
             {% if logado %}
-            {# Celular/tela estreita: abas no topo. Tela larga: menu lateral (abaixo). #}
             <nav class="abas" aria-label="Seções">
                 <a href="{{ url_for('dashboard') }}" class="{{ 'ativo' if request.endpoint == 'dashboard' }}">Enviar</a>
                 <a href="{{ url_for('modelos') }}" class="{{ 'ativo' if request.endpoint == 'modelos' }}">Modelos</a>
@@ -747,18 +712,6 @@
             <button type="button" id="botaoTema" class="botao-tema" aria-label="Alternar tema claro/escuro" title="Alternar tema claro/escuro">🌙</button>
         </div>
     </header>
-    <div class="layout">
-    {% if logado %}
-    <nav class="menu-lateral" aria-label="Seções">
-        <a href="{{ url_for('dashboard') }}" class="{{ 'ativo' if request.endpoint == 'dashboard' }}">📣 Enviar aviso</a>
-        <a href="{{ url_for('modelos') }}" class="{{ 'ativo' if request.endpoint == 'modelos' }}">🗂 Modelos</a>
-        <a href="{{ url_for('logs') }}" class="{{ 'ativo' if request.endpoint == 'logs' }}">📜 Logs</a>
-        {% if usuario_e_admin %}
-        <hr>
-        <a href="{{ url_for('configuracoes') }}" class="{{ 'ativo' if request.endpoint == 'configuracoes' }}">⚙ Configurações</a>
-        {% endif %}
-    </nav>
-    {% endif %}
     <main>
         {% with mensagens = get_flashed_messages(with_categories=true) %}
             {% if mensagens %}
@@ -769,7 +722,6 @@
         {% endwith %}
         {% block conteudo %}{% endblock %}
     </main>
-    </div>
     <script>
         (function () {
             // Alternância manual de tema — persiste em localStorage; sem
