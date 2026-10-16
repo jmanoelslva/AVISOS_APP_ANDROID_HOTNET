@@ -3,6 +3,15 @@
 Todas as mudanças relevantes do painel de avisos e do poller de eventos por conta.
 Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/).
 
+## [1.4.1] - 2026-10-16
+
+### Corrigido
+- Notificações do Histórico mostram o nome completo do cliente
+  (`client_complete_name`); `client_name` do Controllr é só o primeiro nome.
+
+### Como atualizar o servidor
+O mesmo da 1.4.0 (`git pull`, `chown`, `systemctl restart aviso-broadcaster`).
+
 ## [1.4.0] - 2026-10-16
 
 ### Adicionado

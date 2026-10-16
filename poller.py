@@ -34,7 +34,10 @@ def _anotar(tipo: str, registro: dict, dados: dict, erro: Exception | None = Non
     entrada = {
         "tipo": tipo,
         "ok": erro is None,
-        "cliente": registro.get("client_name") or "",
+        # client_name é só o primeiro nome (às vezes dois); o completo vem em client_complete_name
+        # (confirmado nas listas de faturas e de chamados).
+        "cliente": registro.get("client_complete_name")
+        or " ".join(p for p in (registro.get("client_name"), registro.get("client_lastname")) if p),
         "doc": registro.get("client_doc1") or "",
         **{chave: str(valor) for chave, valor in dados.items() if valor not in (None, "")},
     }
