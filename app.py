@@ -11,6 +11,7 @@ from werkzeug.security import check_password_hash, generate_password_hash
 
 import access_log
 import config_store
+import painel_info
 from fcm_sender import enviar_aviso
 from security import validar_forca_senha
 
@@ -114,7 +115,11 @@ def admin_obrigatorio(f):
 def injetar_usuario_e_admin():
     cfg = config_store.carregar()
     entrada = _entrada_usuario_logado(cfg)
-    return {"usuario_e_admin": bool(entrada and entrada.get("is_admin"))}
+    return {"usuario_e_admin": bool(entrada and entrada.get("is_admin")), "emojis": painel_info.EMOJIS}
+
+# Limites do push (iguais aos maxlength dos formulários; o servidor também confere).
+LIMITE_TITULO = 80
+LIMITE_MENSAGEM = 500
 
 
 @app.route("/login", methods=["GET", "POST"])
@@ -199,14 +204,17 @@ def dashboard():
         corpo = request.form.get("mensagem", "").strip()
         if not corpo:
             flash("Digite uma mensagem.", "erro")
+        elif len(titulo) > LIMITE_TITULO or len(corpo) > LIMITE_MENSAGEM:
+            flash(f"Texto grande demais: título até {LIMITE_TITULO} e mensagem até {LIMITE_MENSAGEM} caracteres.", "erro")
         else:
             try:
                 enviar_aviso(titulo, corpo)
                 access_log.registrar(
                     "aviso_enviado", usuario=session.get("usuario", ""),
-                    ip=_ip_do_cliente(), detalhes=titulo,
+                    ip=_ip_do_cliente(), detalhes=titulo, mensagem=corpo,
                 )
-                flash("Aviso enviado com sucesso!", "sucesso")
+                flash(f"Aviso \u201c{titulo}\u201d enviado às {painel_info.agora_hhmm()}.", "sucesso")
+                return redirect(url_for("dashboard"))
             except Exception as e:
                 app.logger.exception("Falha ao enviar aviso")
                 access_log.registrar(
@@ -221,7 +229,18 @@ def dashboard():
                 )
 
     cfg = config_store.carregar()
-    return render_template("dashboard.html", templates=cfg.get("templates", []))
+    eventos = access_log.listar(limite=access_log.MAX_LINHAS)
+    # "Usar" na página Modelos abre aqui com o modelo já escolhido.
+    modelo_inicial = request.args.get("modelo", "")
+    return render_template(
+        "dashboard.html",
+        templates=cfg.get("templates", []),
+        modelo_inicial=modelo_inicial,
+        ultimos_avisos=painel_info.ultimos_avisos(eventos),
+        poller=painel_info.status_poller(eventos),
+        limite_titulo=LIMITE_TITULO,
+        limite_mensagem=LIMITE_MENSAGEM,
+    )
 
 
 @app.route("/modelos", methods=["GET", "POST"])
@@ -286,7 +305,9 @@ def modelos():
 @app.route("/logs")
 @login_obrigatorio
 def logs():
-    return render_template("logs.html", eventos=access_log.listar())
+    eventos = painel_info.eventos_para_tabela(access_log.listar(limite=access_log.MAX_LINHAS))
+    falhas = sum(1 for e in eventos if "falhas" in e["categorias"].split())
+    return render_template("logs.html", eventos=eventos, total_falhas=falhas)
 
 
 @app.route("/minha-senha", methods=["GET", "POST"])

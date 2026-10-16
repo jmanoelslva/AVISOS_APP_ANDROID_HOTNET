@@ -1,78 +1,193 @@
 {% extends "base.html" %}
-{% block titulo %}Enviar aviso{% endblock %}
+{% import "_emojis.html" as em with context %}
+{% block titulo %}Enviar aviso · Avisos HOTNET{% endblock %}
 {% block conteudo %}
-<div class="card">
-    <h2>Enviar aviso para todos os usuários</h2>
-    <p class="dica">
-        A mensagem chega como notificação push pra todo mundo que tem o
-        app instalado — use pra avisos de manutenção programada ou
-        instabilidade na rede.
-    </p>
-
-    {% if templates %}
-    <label>Modelo pronto (opcional)</label>
-    <div class="lista-modelos">
-        <label class="opcao-modelo">
-            <input type="radio" name="modelo_radio" class="radio-modelo" value=""
-                   data-titulo="" data-mensagem="" checked>
-            Escrever mensagem própria
-        </label>
-        {% for t in templates %}
-        <label class="opcao-modelo">
-            <input type="radio" name="modelo_radio" class="radio-modelo" value="{{ t.id }}"
-                   data-titulo="{{ t.titulo }}" data-mensagem="{{ t.mensagem }}">
-            {{ t.nome }}
-        </label>
-        {% endfor %}
-    </div>
-    <p class="dica">
-        <strong>Selecionar um modelo só preenche os campos abaixo — nada é
-        enviado nesse momento.</strong> Confira e ajuste o texto se
-        precisar; o aviso só sai de fato quando você clicar em "Enviar
-        para todos" e confirmar.
-        <a href="{{ url_for('modelos') }}">Gerenciar modelos</a>
-    </p>
-    {% else %}
-    <p class="dica">
-        Nenhum modelo pronto cadastrado ainda. <a href="{{ url_for('modelos') }}">Criar o primeiro modelo</a>
-    </p>
-    {% endif %}
-
-    <form method="post" onsubmit="return confirmarEnvio()">
-        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-        <label>Título (opcional)</label>
-        <input type="text" id="campoTitulo" name="titulo" placeholder="Aviso da HOTNET" maxlength="80">
-
-        <label>Mensagem</label>
-        <textarea
-            id="campoMensagem"
-            name="mensagem"
-            required
-            maxlength="500"
-            placeholder="Ex: Manutenção programada hoje das 23h às 01h na região X. A conexão pode oscilar nesse período."
-        ></textarea>
-
-        <button type="submit" id="botaoEnviarAviso">Enviar para todos</button>
-    </form>
+<div class="cabecalho-pagina">
+    <h1>Enviar aviso</h1>
+    <p class="dica">Chega como notificação para <strong>todos os clientes</strong> com o app instalado. Use para manutenção programada ou instabilidade na rede.</p>
 </div>
 
-<script>
-    document.querySelectorAll('.radio-modelo').forEach(function (radio) {
-        radio.addEventListener('change', function () {
-            document.getElementById('campoTitulo').value = this.dataset.titulo || '';
-            document.getElementById('campoMensagem').value = this.dataset.mensagem || '';
-        });
-    });
+<div class="grade-envio">
+    <div class="card">
+        {% if templates %}
+        <label>Começar de um modelo</label>
+        <div class="cartoes-modelo" role="group" aria-label="Modelos">
+            <button type="button" class="cartao-modelo" data-modelo="" data-titulo="" data-mensagem="" aria-pressed="{{ 'false' if modelo_inicial else 'true' }}">
+                <strong>✎ Em branco</strong><span>Escrever uma mensagem nova</span>
+            </button>
+            {% for t in templates %}
+            <button type="button" class="cartao-modelo" data-modelo="{{ t.id }}" data-titulo="{{ t.titulo }}" data-mensagem="{{ t.mensagem }}" aria-pressed="{{ 'true' if t.id == modelo_inicial else 'false' }}">
+                <strong>{{ t.nome }}</strong><span>{{ t.mensagem }}</span>
+            </button>
+            {% endfor %}
+        </div>
+        <p class="dica">Escolher um modelo só preenche os campos; nada é enviado. <a href="{{ url_for('modelos') }}">Gerenciar modelos</a></p>
+        {% else %}
+        <p class="dica">Nenhum modelo cadastrado ainda. <a href="{{ url_for('modelos') }}">Criar o primeiro modelo</a></p>
+        {% endif %}
 
-    function confirmarEnvio() {
-        const mensagem = document.getElementById('campoMensagem').value;
-        const confirmado = confirm('Confirma o envio deste aviso para TODOS os usuários agora?\n\n' + mensagem);
-        if (confirmado) {
-            const botao = document.getElementById('botaoEnviarAviso');
-            botao.disabled = true;
-            botao.textContent = 'Enviando...';
+        <form method="post" id="formAviso">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <label class="rotulo-linha" for="campoTitulo"><span>Título (opcional)</span><span class="contador" id="contTitulo">0/{{ limite_titulo }}</span></label>
+            <input type="text" id="campoTitulo" name="titulo" placeholder="Aviso da HOTNET" maxlength="{{ limite_titulo }}" data-recebe-emoji>
+
+            <label class="rotulo-linha" for="campoMensagem"><span>Mensagem</span><span class="contador" id="contMensagem">0/{{ limite_mensagem }}</span></label>
+            {{ em.paleta() }}
+            <textarea id="campoMensagem" name="mensagem" required maxlength="{{ limite_mensagem }}" data-recebe-emoji
+                placeholder="Ex: Manutenção programada hoje das 23h às 01h na região X. A conexão pode oscilar nesse período."></textarea>
+
+            <button type="submit" id="botaoEnviarAviso">Revisar e enviar</button>
+        </form>
+    </div>
+
+    <div class="previa" aria-label="Prévia da notificação">
+        <div class="celular">
+            <span class="rotulo-previa">Como vai aparecer</span>
+            <div class="notificacao">
+                <span class="icone-app" aria-hidden="true">HN</span>
+                <div><strong data-previa-titulo>Aviso da HOTNET</strong><p class="uma-linha" data-previa-texto></p></div>
+            </div>
+            <span class="rotulo-previa">Ao abrir a notificação</span>
+            <div class="notificacao">
+                <span class="icone-app" aria-hidden="true">HN</span>
+                <div><strong data-previa-titulo>Aviso da HOTNET</strong><p data-previa-texto></p></div>
+            </div>
+            <span class="alerta-corte" id="alertaCorte" hidden>Recolhida, a notificação mostra só o começo; o resto aparece ao abrir.</span>
+            <span class="rotulo-previa">No sino do app</span>
+            <div class="notificacao sino">
+                <span class="icone-app" aria-hidden="true">📣</span>
+                <div><strong data-previa-titulo>Aviso da HOTNET</strong><p data-previa-texto></p></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="grid-2col" style="margin-top:22px">
+    <div class="card">
+        <div class="titulo-card"><span class="icone-card">🕘</span><h2>Últimos avisos enviados</h2></div>
+        {% if ultimos_avisos %}
+        <ul class="lista-historico">
+            {% for a in ultimos_avisos %}
+            <li>
+                <span class="quando" title="{{ a.quando }}">{{ a.relativo }}</span>
+                <span class="texto"><strong>{{ a.detalhes }}</strong>{% if a.usuario %} · {{ a.usuario }}{% endif %}{% if a.mensagem %}<span>{{ a.mensagem }}</span>{% endif %}</span>
+                {% if a.mensagem %}
+                <button type="button" class="botao-link usar-de-novo" data-titulo="{{ a.detalhes }}" data-mensagem="{{ a.mensagem }}">Usar de novo</button>
+                {% endif %}
+            </li>
+            {% endfor %}
+        </ul>
+        {% else %}
+        <p class="dica">Nenhum aviso enviado ainda.</p>
+        {% endif %}
+    </div>
+
+    {% if poller %}
+    <div class="card">
+        <div class="titulo-card"><span class="icone-card">🤖</span><h2>Notificações automáticas</h2></div>
+        <p class="dica" style="margin:0">Pagamento confirmado, chamado respondido, atraso e boleto que vence amanhã.</p>
+        <div class="status-poller">
+            <div><small>Último ciclo</small><strong class="{{ 'ruim' if poller.parado else 'ok' }}">● {{ poller.ultimo_hora }}</strong><p class="dica">{{ poller.ultimo_relativo }}</p></div>
+            <div><small>Próximo</small><strong>{{ poller.proximo_hora }}</strong><p class="dica">{{ poller.intervalo }}</p></div>
+            <div><small>Falhas 24h</small><strong class="{{ 'ruim' if poller.falhas_24h else 'ok' }}">{{ poller.falhas_24h }}</strong><p class="dica">{{ 'ver em Logs' if poller.falhas_24h else 'nenhuma' }}</p></div>
+        </div>
+        {% if poller.parado %}
+        <p class="dica ruim" style="margin-top:10px"><strong>O poller pode estar parado:</strong> confira <code>systemctl list-timers controllr-poller.timer</code>.</p>
+        {% endif %}
+        {% if poller.resumo %}<p class="dica" style="margin-top:10px">Último ciclo: {{ poller.resumo }}</p>{% endif %}
+    </div>
+    {% endif %}
+</div>
+
+<dialog class="confirmacao" id="dialogoEnvio" aria-labelledby="tituloDialogo">
+    <h2 id="tituloDialogo">Enviar para todos os clientes?</h2>
+    <p class="dica">Chega agora em todos os celulares com o app instalado. Não dá para desfazer.</p>
+    <div class="notificacao">
+        <span class="icone-app" aria-hidden="true">HN</span>
+        <div><strong data-previa-titulo>Aviso da HOTNET</strong><p data-previa-texto></p></div>
+    </div>
+    <div class="acoes-dialogo">
+        <button type="button" class="botao-secundario" id="botaoVoltar">Voltar e editar</button>
+        <button type="button" id="botaoConfirmar">Enviar agora</button>
+    </div>
+</dialog>
+
+{{ em.script() }}
+<script>
+    (function () {
+        var form = document.getElementById('formAviso');
+        var titulo = document.getElementById('campoTitulo');
+        var mensagem = document.getElementById('campoMensagem');
+        var dialogo = document.getElementById('dialogoEnvio');
+        var VAZIO = 'Sua mensagem aparece aqui.';
+
+        function contar(campo, rotulo) {
+            var max = parseInt(campo.getAttribute('maxlength'), 10);
+            rotulo.textContent = campo.value.length + '/' + max;
+            rotulo.classList.toggle('perto', campo.value.length >= max * 0.9);
         }
-        return confirmado;
-    }
+
+        function atualizar() {
+            var t = titulo.value.trim() || 'Aviso da HOTNET';
+            var m = mensagem.value.trim() || VAZIO;
+            // textContent: o texto digitado nunca vira HTML.
+            document.querySelectorAll('[data-previa-titulo]').forEach(function (el) { el.textContent = t; });
+            document.querySelectorAll('[data-previa-texto]').forEach(function (el) { el.textContent = m; });
+            document.getElementById('alertaCorte').hidden = mensagem.value.trim().length <= 60;
+            contar(titulo, document.getElementById('contTitulo'));
+            contar(mensagem, document.getElementById('contMensagem'));
+        }
+
+        function preencher(t, m) {
+            titulo.value = t || '';
+            mensagem.value = m || '';
+            atualizar();
+        }
+
+        document.querySelectorAll('.cartao-modelo').forEach(function (cartao) {
+            cartao.addEventListener('click', function () {
+                document.querySelectorAll('.cartao-modelo').forEach(function (c) { c.setAttribute('aria-pressed', 'false'); });
+                cartao.setAttribute('aria-pressed', 'true');
+                preencher(cartao.dataset.titulo, cartao.dataset.mensagem);
+            });
+        });
+        var inicial = document.querySelector('.cartao-modelo[aria-pressed="true"]:not([data-modelo=""])');
+        if (inicial) preencher(inicial.dataset.titulo, inicial.dataset.mensagem);
+
+        document.querySelectorAll('.usar-de-novo').forEach(function (botao) {
+            botao.addEventListener('click', function () {
+                document.querySelectorAll('.cartao-modelo').forEach(function (c) { c.setAttribute('aria-pressed', 'false'); });
+                preencher(botao.dataset.titulo, botao.dataset.mensagem);
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+                mensagem.focus();
+            });
+        });
+
+        titulo.addEventListener('input', atualizar);
+        mensagem.addEventListener('input', atualizar);
+        atualizar();
+
+        // Confirmação no próprio painel, com a notificação exata (antes era o confirm() do navegador).
+        form.addEventListener('submit', function (ev) {
+            ev.preventDefault();
+            if (!mensagem.value.trim()) { mensagem.reportValidity(); return; }
+            if (typeof dialogo.showModal !== 'function') {
+                if (confirm('Confirma o envio deste aviso para TODOS os clientes agora?\n\n' + mensagem.value)) enviar();
+                return;
+            }
+            atualizar();
+            dialogo.showModal();
+        });
+        document.getElementById('botaoVoltar').addEventListener('click', function () { dialogo.close(); });
+        document.getElementById('botaoConfirmar').addEventListener('click', enviar);
+
+        function enviar() {
+            var b = document.getElementById('botaoConfirmar');
+            b.disabled = true;
+            b.textContent = 'Enviando…';
+            document.getElementById('botaoEnviarAviso').disabled = true;
+            form.submit();
+        }
+    })();
 </script>
 {% endblock %}

@@ -1,0 +1,53 @@
+{# Paleta de emojis (P8): um toque insere o emoji onde está o cursor do último campo
+   com data-recebe-emoji (título ou mensagem). A lista fica em painel_info.EMOJIS. #}
+{% macro paleta() %}
+<div class="paleta-emojis" data-paleta-emojis>
+    <div class="grupos" role="group" aria-label="Grupos de emojis">
+        {% for grupo, _ in emojis %}
+        <button type="button" data-grupo="{{ loop.index0 }}" aria-pressed="{{ 'true' if loop.first else 'false' }}">{{ grupo }}</button>
+        {% endfor %}
+    </div>
+    {% for grupo, lista in emojis %}
+    <div class="lista" data-lista="{{ loop.index0 }}" {% if not loop.first %}hidden{% endif %}>
+        {% for e in lista %}
+        <button type="button" data-emoji="{{ e }}" aria-label="Inserir {{ e }}" title="Inserir {{ e }}">{{ e }}</button>
+        {% endfor %}
+    </div>
+    {% endfor %}
+</div>
+{% endmacro %}
+
+{% macro script() %}
+<script>
+    (function () {
+        var ultimoCampo = null;
+        document.querySelectorAll('[data-recebe-emoji]').forEach(function (campo) {
+            campo.addEventListener('focus', function () { ultimoCampo = campo; });
+        });
+        document.querySelectorAll('[data-paleta-emojis]').forEach(function (paleta) {
+            paleta.querySelectorAll('[data-grupo]').forEach(function (botao) {
+                botao.addEventListener('click', function () {
+                    paleta.querySelectorAll('[data-grupo]').forEach(function (b) { b.setAttribute('aria-pressed', 'false'); });
+                    botao.setAttribute('aria-pressed', 'true');
+                    paleta.querySelectorAll('[data-lista]').forEach(function (l) { l.hidden = l.dataset.lista !== botao.dataset.grupo; });
+                });
+            });
+            paleta.querySelectorAll('[data-emoji]').forEach(function (botao) {
+                botao.addEventListener('click', function () {
+                    var campo = ultimoCampo || document.querySelector('textarea[data-recebe-emoji]');
+                    if (!campo) return;
+                    var emoji = botao.dataset.emoji;
+                    var limite = parseInt(campo.getAttribute('maxlength') || '0', 10);
+                    if (limite && campo.value.length + emoji.length > limite) return;
+                    var ini = campo.selectionStart != null ? campo.selectionStart : campo.value.length;
+                    var fim = campo.selectionEnd != null ? campo.selectionEnd : campo.value.length;
+                    campo.value = campo.value.slice(0, ini) + emoji + campo.value.slice(fim);
+                    campo.focus();
+                    campo.setSelectionRange(ini + emoji.length, ini + emoji.length);
+                    campo.dispatchEvent(new Event('input', { bubbles: true }));
+                });
+            });
+        });
+    })();
+</script>
+{% endmacro %}

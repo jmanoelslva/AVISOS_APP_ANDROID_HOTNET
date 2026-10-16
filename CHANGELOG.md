@@ -3,6 +3,40 @@
 Todas as mudanças relevantes do painel de avisos e do poller de eventos por conta.
 Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/).
 
+## [1.2.0] - 2026-10-16
+
+### Adicionado
+- Enviar aviso: prévia ao vivo de como a notificação aparece (recolhida, aberta e
+  no sino do app), contadores de caracteres e alerta quando o texto passa do que
+  cabe recolhido.
+- Paleta de emojis por assunto (Rede, Horário, Status, Atendimento) no envio e nos
+  modelos; insere onde está o cursor. A lista fica em `painel_info.py`.
+- Confirmação de envio numa janela do próprio painel, com a notificação exata
+  (antes era o `confirm()` do navegador).
+- "Últimos avisos enviados" com "Usar de novo" (o log passa a guardar também a
+  mensagem do aviso).
+- Cartão "Notificações automáticas" com último ciclo do poller, próximo e falhas
+  em 24h; avisa quando o poller parece parado.
+- Modelos em cartões no envio; "Usar" na página Modelos abre o envio preenchido.
+- Logs com filtros (Avisos, Acessos, Poller, Falhas), etiquetas, nomes legíveis
+  dos eventos do poller e hora relativa; ciclos sem notificação ficam ocultos
+  por padrão.
+
+### Alterado
+- Identidade alinhada ao app: laranja sólido #C94300 (botões com contraste
+  melhor), nome "Avisos HOTNET", menu lateral no computador e menu da conta
+  (Minha senha, Sair) no topo.
+- Servidor recusa título acima de 80 e mensagem acima de 500 caracteres.
+- `install.sh` copia também `access_log.py` e `painel_info.py`.
+
+### Como atualizar o servidor
+```bash
+cd /opt/aviso-broadcaster && git pull
+chown -R aviso-broadcaster: /opt/aviso-broadcaster
+systemctl restart aviso-broadcaster
+```
+O poller não muda e não precisa reiniciar.
+
 ## [1.1.0] - 2026-10-16
 
 ### Adicionado
@@ -41,5 +75,6 @@ Estado em produção desde o piloto de push por conta.
 - Pagamento confirmado usa `invoice_amount_paid` (valor realmente pago) em vez do
   valor do documento.
 
+[1.2.0]: https://github.com/jmanoelslva/AVISOS_APP_ANDROID_HOTNET/compare/v1.1.0...v1.2.0
 [1.1.0]: https://github.com/jmanoelslva/AVISOS_APP_ANDROID_HOTNET/compare/v1.0.0...v1.1.0
 [1.0.0]: https://github.com/jmanoelslva/AVISOS_APP_ANDROID_HOTNET/releases/tag/v1.0.0

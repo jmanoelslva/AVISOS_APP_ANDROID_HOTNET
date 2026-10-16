@@ -1,45 +1,41 @@
 {% extends "base.html" %}
-{% block titulo %}Log de acessos{% endblock %}
+{% block titulo %}Logs · Avisos HOTNET{% endblock %}
 {% block conteudo %}
 
-<div class="card">
-    <h2>Log de acessos e ações</h2>
-    <p class="dica">
-        Registra login (sucesso e falha), envio de avisos e alterações de
-        usuários — mais recentes primeiro. Mantém só os últimos 500
-        eventos.
-    </p>
+<div class="cabecalho-pagina">
+    <h1>Logs</h1>
+    <p class="dica">Logins, avisos enviados, alterações de usuários e os ciclos do poller, mais recentes primeiro (últimos 500 eventos).</p>
+</div>
 
+<div class="card">
     {% if eventos %}
+    <div class="filtros-logs" role="group" aria-label="Filtrar por tipo">
+        <button type="button" data-filtro="" aria-pressed="true">Tudo</button>
+        <button type="button" data-filtro="avisos" aria-pressed="false">Avisos</button>
+        <button type="button" data-filtro="acessos" aria-pressed="false">Acessos</button>
+        <button type="button" data-filtro="poller" aria-pressed="false">Poller</button>
+        <button type="button" data-filtro="falhas" aria-pressed="false">Falhas · {{ total_falhas }}</button>
+    </div>
     <label for="filtroLogs">Buscar (usuário, evento, IP ou detalhes)</label>
-    <input type="text" id="filtroLogs" placeholder="Digite pra filtrar a tabela abaixo...">
-    <div class="tabela-logs-scroll">
+    <input type="text" id="filtroLogs" placeholder="Digite para filtrar a tabela abaixo…">
+    <label class="opcao-check"><input type="checkbox" id="mostrarCiclosVazios"> Mostrar ciclos do poller sem notificação</label>
+    <div class="tabela-logs-scroll" style="margin-top:12px">
         <table class="tabela-logs">
             <thead>
                 <tr>
                     <th>Quando</th>
                     <th>Evento</th>
-                    <th>Usuário</th>
+                    <th>Quem</th>
                     <th>IP</th>
                     <th>Detalhes</th>
                 </tr>
             </thead>
             <tbody>
                 {% for e in eventos %}
-                <tr>
-                    <td>{{ e.quando }}</td>
-                    <td>
-                        {% if e.evento == 'login_sucesso' %}Login (sucesso)
-                        {% elif e.evento == 'login_falha' %}Login (falha)
-                        {% elif e.evento == 'aviso_enviado' %}Aviso enviado
-                        {% elif e.evento == 'aviso_falha' %}Falha ao enviar aviso
-                        {% elif e.evento == 'usuario_criado' %}Usuário criado
-                        {% elif e.evento == 'usuario_removido' %}Usuário removido
-                        {% elif e.evento == 'senha_alterada' %}Senha alterada
-                        {% else %}{{ e.evento }}
-                        {% endif %}
-                    </td>
-                    <td>{{ e.usuario }}</td>
+                <tr data-cat="{{ e.categorias }}" data-vazio="{{ '1' if e.ciclo_vazio else '0' }}">
+                    <td title="{{ e.quando }}">{{ e.relativo }}</td>
+                    <td><span class="etiqueta {{ e.classe }}">{{ e.rotulo }}</span></td>
+                    <td>{{ e.quem }}</td>
                     <td>{{ e.ip }}</td>
                     <td>{{ e.detalhes }}</td>
                 </tr>
@@ -47,7 +43,7 @@
             </tbody>
         </table>
     </div>
-    <p class="dica" id="filtroSemResultado" style="display:none;">Nenhum evento corresponde à busca.</p>
+    <p class="dica" id="filtroSemResultado" style="display:none;">Nenhum evento corresponde ao filtro.</p>
     {% else %}
     <p class="dica">Nenhum evento registrado ainda.</p>
     {% endif %}
@@ -59,16 +55,35 @@
         if (!campo) return;
         var linhas = document.querySelectorAll('.tabela-logs tbody tr');
         var semResultado = document.getElementById('filtroSemResultado');
-        campo.addEventListener('input', function () {
+        var mostrarVazios = document.getElementById('mostrarCiclosVazios');
+        var filtro = '';
+
+        function aplicar() {
             var termo = campo.value.trim().toLowerCase();
             var visiveis = 0;
             linhas.forEach(function (linha) {
-                var bate = !termo || linha.textContent.toLowerCase().includes(termo);
+                var cats = (linha.dataset.cat || '').split(' ');
+                var bate = (!filtro || cats.indexOf(filtro) >= 0) &&
+                    (!termo || linha.textContent.toLowerCase().includes(termo)) &&
+                    // Ciclos que não notificaram ninguém ficam escondidos, salvo pedido (ou filtro Poller).
+                    (linha.dataset.vazio !== '1' || mostrarVazios.checked || filtro === 'poller');
                 linha.style.display = bate ? '' : 'none';
                 if (bate) visiveis++;
             });
             semResultado.style.display = visiveis === 0 ? 'block' : 'none';
+        }
+
+        document.querySelectorAll('.filtros-logs button').forEach(function (b) {
+            b.addEventListener('click', function () {
+                document.querySelectorAll('.filtros-logs button').forEach(function (x) { x.setAttribute('aria-pressed', 'false'); });
+                b.setAttribute('aria-pressed', 'true');
+                filtro = b.dataset.filtro;
+                aplicar();
+            });
         });
+        campo.addEventListener('input', aplicar);
+        mostrarVazios.addEventListener('change', aplicar);
+        aplicar();
     })();
 </script>
 {% endblock %}

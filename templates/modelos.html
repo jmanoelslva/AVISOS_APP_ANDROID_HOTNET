@@ -1,38 +1,46 @@
 {% extends "base.html" %}
-{% block titulo %}Modelos de mensagem{% endblock %}
+{% import "_emojis.html" as em with context %}
+{% block titulo %}Modelos · Avisos HOTNET{% endblock %}
 {% block conteudo %}
 
+<div class="cabecalho-pagina">
+    <h1>Modelos</h1>
+    <p class="dica">Textos prontos para os avisos mais comuns. "Usar" abre o envio já preenchido; nada é enviado sem revisar.</p>
+</div>
+
 <div class="card">
-    <h2 id="tituloFormModelo">Novo modelo</h2>
+    <div class="titulo-card"><span class="icone-card">✏️</span><h2 id="tituloFormModelo">Novo modelo</h2></div>
     <form method="post" id="formModelo">
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <input type="hidden" name="acao" id="campoAcao" value="criar">
         <input type="hidden" name="id" id="campoId" value="">
 
-        <label>Nome do modelo (só pra você identificar na lista)</label>
+        <label for="campoNome">Nome do modelo (só para você identificar)</label>
         <input type="text" name="nome" id="campoNome" required maxlength="60" placeholder="Ex: Manutenção programada">
 
-        <label>Título da notificação (opcional)</label>
-        <input type="text" name="titulo" id="campoTituloModelo" maxlength="80" placeholder="Aviso da HOTNET">
+        <label class="rotulo-linha" for="campoTituloModelo"><span>Título da notificação (opcional)</span><span class="contador" id="contTituloModelo">0/80</span></label>
+        <input type="text" name="titulo" id="campoTituloModelo" maxlength="80" placeholder="Aviso da HOTNET" data-recebe-emoji>
 
-        <label>Mensagem</label>
-        <textarea name="mensagem" id="campoMensagemModelo" required maxlength="500" placeholder="Texto que vai no corpo da notificação"></textarea>
+        <label class="rotulo-linha" for="campoMensagemModelo"><span>Mensagem</span><span class="contador" id="contMensagemModelo">0/500</span></label>
+        {{ em.paleta() }}
+        <textarea name="mensagem" id="campoMensagemModelo" required maxlength="500" placeholder="Texto que vai no corpo da notificação" data-recebe-emoji></textarea>
 
         <button type="submit" id="botaoSalvarModelo">Criar modelo</button>
-        <button type="button" id="botaoCancelarEdicao" class="botao-secundario" onclick="cancelarEdicao()" style="display:none;">Cancelar edição</button>
+        <button type="button" id="botaoCancelarEdicao" class="botao-secundario" style="display:none;">Cancelar edição</button>
     </form>
 </div>
 
 <div class="card">
-    <h2>Modelos cadastrados</h2>
+    <div class="titulo-card"><span class="icone-card">🗂</span><h2>Modelos cadastrados</h2></div>
     {% if templates %}
         {% for t in templates %}
         <div class="item-modelo">
             <div>
                 <strong>{{ t.nome }}</strong>
-                <p class="dica">{{ t.mensagem }}</p>
+                <p class="dica">{% if t.titulo and t.titulo != 'Aviso da HOTNET' %}<strong>{{ t.titulo }}</strong> · {% endif %}{{ t.mensagem }}</p>
             </div>
             <div class="acoes-modelo">
+                <a class="botao-link" href="{{ url_for('dashboard', modelo=t.id) }}" style="text-decoration:none">Usar</a>
                 <button type="button" class="botao-secundario editar-modelo-btn"
                         data-id="{{ t.id }}" data-nome="{{ t.nome }}"
                         data-titulo="{{ t.titulo }}" data-mensagem="{{ t.mensagem }}">
@@ -52,34 +60,46 @@
     {% endif %}
 </div>
 
+{{ em.script() }}
 <script>
-    document.querySelectorAll('.editar-modelo-btn').forEach(function (botao) {
-        botao.addEventListener('click', function () {
-            editarModelo(this.dataset.id, this.dataset.nome, this.dataset.titulo, this.dataset.mensagem);
+    (function () {
+        var titulo = document.getElementById('campoTituloModelo');
+        var mensagem = document.getElementById('campoMensagemModelo');
+
+        function contar(campo, rotulo) {
+            var max = parseInt(campo.getAttribute('maxlength'), 10);
+            rotulo.textContent = campo.value.length + '/' + max;
+            rotulo.classList.toggle('perto', campo.value.length >= max * 0.9);
+        }
+        function atualizar() {
+            contar(titulo, document.getElementById('contTituloModelo'));
+            contar(mensagem, document.getElementById('contMensagemModelo'));
+        }
+        titulo.addEventListener('input', atualizar);
+        mensagem.addEventListener('input', atualizar);
+
+        function preencher(acao, id, nome, t, m, cabecalho, botao, cancelar) {
+            document.getElementById('campoAcao').value = acao;
+            document.getElementById('campoId').value = id;
+            document.getElementById('campoNome').value = nome;
+            titulo.value = t;
+            mensagem.value = m;
+            document.getElementById('tituloFormModelo').innerText = cabecalho;
+            document.getElementById('botaoSalvarModelo').innerText = botao;
+            document.getElementById('botaoCancelarEdicao').style.display = cancelar ? 'inline-block' : 'none';
+            atualizar();
+        }
+
+        document.querySelectorAll('.editar-modelo-btn').forEach(function (b) {
+            b.addEventListener('click', function () {
+                preencher('editar', b.dataset.id, b.dataset.nome, b.dataset.titulo, b.dataset.mensagem, 'Editar modelo', 'Salvar alterações', true);
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+            });
         });
-    });
-
-    function editarModelo(id, nome, titulo, mensagem) {
-        document.getElementById('campoAcao').value = 'editar';
-        document.getElementById('campoId').value = id;
-        document.getElementById('campoNome').value = nome;
-        document.getElementById('campoTituloModelo').value = titulo;
-        document.getElementById('campoMensagemModelo').value = mensagem;
-        document.getElementById('tituloFormModelo').innerText = 'Editar modelo';
-        document.getElementById('botaoSalvarModelo').innerText = 'Salvar alterações';
-        document.getElementById('botaoCancelarEdicao').style.display = 'inline-block';
-        window.scrollTo({ top: 0, behavior: 'smooth' });
-    }
-
-    function cancelarEdicao() {
-        document.getElementById('campoAcao').value = 'criar';
-        document.getElementById('campoId').value = '';
-        document.getElementById('campoNome').value = '';
-        document.getElementById('campoTituloModelo').value = '';
-        document.getElementById('campoMensagemModelo').value = '';
-        document.getElementById('tituloFormModelo').innerText = 'Novo modelo';
-        document.getElementById('botaoSalvarModelo').innerText = 'Criar modelo';
-        document.getElementById('botaoCancelarEdicao').style.display = 'none';
-    }
+        document.getElementById('botaoCancelarEdicao').addEventListener('click', function () {
+            preencher('criar', '', '', '', '', 'Novo modelo', 'Criar modelo', false);
+        });
+        atualizar();
+    })();
 </script>
 {% endblock %}

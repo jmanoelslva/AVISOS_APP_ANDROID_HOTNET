@@ -3,7 +3,7 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>{% block titulo %}Aviso Broadcaster{% endblock %}</title>
+    <title>{% block titulo %}Avisos HOTNET{% endblock %}</title>
     <script>
         // Aplica a escolha manual de tema (se houver) antes da primeira
         // pintura da página, pra não "piscar" no tema errado. Sem escolha
@@ -29,8 +29,9 @@
             --cor-borda: #E7E8EE;
             --cor-texto: #1D2129;
             --cor-texto-secundario: #6B7280;
-            --cor-acento: #F28F3B;
-            --cor-acento-escuro: #D94A38;
+            --cor-acento: #C94300;
+            --cor-acento-escuro: #A33600;
+            --cor-acento-texto: #A33600;
             --cor-sucesso: #1E8E5A;
             --cor-sucesso-bg: #E9F7EF;
             --cor-sucesso-borda: #BFE8D3;
@@ -66,6 +67,7 @@
                 --cor-hover: rgba(255, 255, 255, 0.04);
                 --cor-input-bg: #1e2025;
                 --cor-badge-bg: rgba(242, 143, 59, 0.18);
+                --cor-acento-texto: #FFB68C;
                 --cor-secundario-bg: rgba(255, 255, 255, 0.06);
                 --cor-secundario-bg-hover: rgba(255, 255, 255, 0.1);
                 --sombra: 0 1px 2px rgba(0, 0, 0, 0.2), 0 8px 24px -12px rgba(0, 0, 0, 0.45);
@@ -84,6 +86,7 @@
             --cor-hover: rgba(255, 255, 255, 0.04);
             --cor-input-bg: #1e2025;
             --cor-badge-bg: rgba(242, 143, 59, 0.18);
+            --cor-acento-texto: #FFB68C;
             --cor-secundario-bg: rgba(255, 255, 255, 0.06);
             --cor-secundario-bg-hover: rgba(255, 255, 255, 0.1);
             --sombra: 0 1px 2px rgba(0, 0, 0, 0.2), 0 8px 24px -12px rgba(0, 0, 0, 0.45);
@@ -113,15 +116,15 @@
             }
         }
         header {
-            background: linear-gradient(135deg, var(--cor-acento-escuro), var(--cor-acento));
+            background: #C94300;
             color: #fff;
-            padding: 18px 28px;
+            padding: 14px 24px;
             display: flex;
             justify-content: space-between;
             align-items: center;
             flex-wrap: wrap;
             gap: 12px;
-            box-shadow: 0 4px 16px -8px rgba(217, 74, 56, 0.5);
+            box-shadow: 0 4px 16px -10px rgba(201, 67, 0, 0.6);
         }
         .marca {
             display: flex;
@@ -153,7 +156,7 @@
             text-transform: uppercase;
             letter-spacing: 0.6px;
         }
-        nav {
+        header nav {
             display: flex;
             align-items: center;
             gap: 2px;
@@ -162,7 +165,7 @@
             border-radius: 999px;
             flex-wrap: wrap;
         }
-        nav a {
+        header nav a {
             color: rgba(255, 255, 255, 0.85);
             text-decoration: none;
             font-size: 13px;
@@ -172,8 +175,8 @@
             transition: background 0.15s ease, color 0.15s ease;
             white-space: nowrap;
         }
-        nav a:hover { background: rgba(255, 255, 255, 0.14); color: #fff; }
-        nav a.ativo { background: #fff; color: var(--cor-acento-escuro); }
+        header nav a:hover { background: rgba(255, 255, 255, 0.14); color: #fff; }
+        header nav a.ativo { background: #fff; color: #A33600; }
         .header-direita {
             display: flex;
             align-items: center;
@@ -296,7 +299,7 @@
         input[type=text]:focus, input[type=password]:focus, input[type=number]:focus, textarea:focus {
             outline: none;
             border-color: var(--cor-acento);
-            box-shadow: 0 0 0 3px rgba(242, 143, 59, 0.18);
+            box-shadow: 0 0 0 3px rgba(201, 67, 0, 0.18);
             background: var(--cor-superficie);
         }
         textarea { min-height: 110px; resize: vertical; line-height: 1.5; }
@@ -312,7 +315,7 @@
             font-family: inherit;
             cursor: pointer;
             transition: background 0.15s ease, transform 0.1s ease, box-shadow 0.15s ease;
-            box-shadow: 0 2px 8px -2px rgba(242, 143, 59, 0.55);
+            box-shadow: 0 2px 8px -2px rgba(201, 67, 0, 0.45);
         }
         button:hover { background: var(--cor-acento-escuro); transform: translateY(-1px); }
         button:active { transform: translateY(0); }
@@ -352,7 +355,7 @@
         }
         .aviso-acl { font-size: 12px; color: var(--cor-texto-secundario); margin-top: 6px; }
         .dica { font-size: 13px; color: var(--cor-texto-secundario); line-height: 1.5; }
-        .dica a { color: var(--cor-acento-escuro); font-weight: 600; text-decoration: none; }
+        .dica a { color: var(--cor-acento-texto); font-weight: 600; text-decoration: none; }
         .dica a:hover { text-decoration: underline; }
         .badge-admin {
             display: inline-block;
@@ -479,33 +482,283 @@
         @media (max-width: 760px) {
             .grid-2col { grid-template-columns: 1fr; }
         }
+        /* ===== 1.2.0: identidade do app, menu lateral, prévia, emojis, confirmação, logs ===== */
+        .layout { display: block; }
+        .menu-lateral { display: none; }
+        @media (min-width: 900px) {
+            body.com-menu .layout {
+                display: grid;
+                grid-template-columns: 210px 1fr;
+                max-width: 1180px;
+                margin: 0 auto;
+                gap: 8px;
+            }
+            body.com-menu .menu-lateral {
+                display: flex;
+                flex-direction: column;
+                gap: 4px;
+                padding: 32px 0 0 20px;
+                position: sticky;
+                top: 0;
+                align-self: start;
+            }
+            body.com-menu header nav.abas { display: none; }
+            body.com-menu main { margin-top: 32px; }
+        }
+        .menu-lateral a {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 10px 12px;
+            border-radius: 12px;
+            color: var(--cor-texto);
+            text-decoration: none;
+            font-weight: 600;
+            font-size: 14px;
+        }
+        .menu-lateral a:hover { background: var(--cor-secundario-bg); }
+        .menu-lateral a.ativo { background: var(--cor-badge-bg); color: var(--cor-acento-texto); }
+        .menu-lateral hr { border: none; border-top: 1px solid var(--cor-borda); margin: 8px 4px; }
+        .menu-usuario { position: relative; }
+        .menu-usuario summary {
+            list-style: none;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 6px 12px 6px 6px;
+            border-radius: 999px;
+            background: rgba(255, 255, 255, 0.16);
+            color: #fff;
+            font-weight: 700;
+            font-size: 13px;
+        }
+        .menu-usuario summary::-webkit-details-marker { display: none; }
+        .menu-usuario summary:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
+        .menu-usuario .avatar-usuario { background: #fff; color: var(--cor-acento); }
+        .menu-usuario-itens {
+            position: absolute;
+            right: 0;
+            top: calc(100% + 8px);
+            min-width: 190px;
+            background: var(--cor-superficie);
+            border: 1px solid var(--cor-borda);
+            border-radius: 14px;
+            box-shadow: var(--sombra);
+            padding: 6px;
+            z-index: 20;
+            display: flex;
+            flex-direction: column;
+        }
+        .menu-usuario-itens a {
+            color: var(--cor-texto);
+            text-decoration: none;
+            font-weight: 600;
+            font-size: 14px;
+            padding: 10px 12px;
+            border-radius: 10px;
+        }
+        .menu-usuario-itens a:hover { background: var(--cor-hover); }
+        .contador { font-weight: 600; text-transform: none; letter-spacing: 0; }
+        .contador.perto { color: var(--cor-erro); }
+        .rotulo-linha { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+        .grade-envio { display: grid; grid-template-columns: 1.15fr 1fr; gap: 22px; align-items: start; }
+        @media (max-width: 860px) { .grade-envio { grid-template-columns: 1fr; } }
+        .pagina-envio main { max-width: 1000px; }
+        .cartoes-modelo { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 8px; margin-top: 8px; }
+        .cartao-modelo {
+            margin: 0;
+            text-align: left;
+            background: var(--cor-superficie);
+            color: var(--cor-texto);
+            border: 1.5px solid var(--cor-borda);
+            border-radius: 12px;
+            padding: 10px 12px;
+            box-shadow: none;
+            font-weight: 500;
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+        }
+        .cartao-modelo:hover { background: var(--cor-hover); transform: none; border-color: var(--cor-acento); }
+        .cartao-modelo[aria-pressed="true"] { border-color: var(--cor-acento); box-shadow: 0 0 0 3px rgba(201, 67, 0, 0.16); }
+        .cartao-modelo strong { font-size: 13.5px; }
+        .cartao-modelo span {
+            font-size: 12px;
+            color: var(--cor-texto-secundario);
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+        }
+        .previa { position: sticky; top: 20px; }
+        .celular {
+            background: #22262d;
+            border-radius: 24px;
+            padding: 14px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        .celular .rotulo-previa { color: #aab1bb; font-size: 10.5px; font-weight: 700; letter-spacing: 0.6px; text-transform: uppercase; }
+        .notificacao {
+            background: #eef0f4;
+            color: #1d2129;
+            border-radius: 16px;
+            padding: 11px 12px;
+            display: grid;
+            grid-template-columns: 30px 1fr;
+            gap: 10px;
+            align-items: start;
+        }
+        .notificacao.sino { background: #fff; }
+        .notificacao .icone-app {
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            background: #fff;
+            color: #c94300;
+            font-weight: 900;
+            font-style: italic;
+            font-size: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .notificacao.sino .icone-app { background: #fde3d6; font-style: normal; }
+        .notificacao strong { display: block; font-size: 13px; overflow-wrap: anywhere; }
+        .notificacao p { margin: 2px 0 0; font-size: 12.5px; color: #3c434d; white-space: pre-wrap; overflow-wrap: anywhere; }
+        .notificacao p.uma-linha { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .alerta-corte { font-size: 12px; color: #f5c27a; }
+        .paleta-emojis { border: 1px solid var(--cor-borda); border-radius: 12px; padding: 8px; background: var(--cor-input-bg); margin-bottom: 6px; }
+        .paleta-emojis .grupos { display: flex; gap: 4px; flex-wrap: wrap; margin-bottom: 6px; }
+        .paleta-emojis .grupos button {
+            margin: 0;
+            padding: 4px 10px;
+            font-size: 12px;
+            font-weight: 700;
+            border-radius: 999px;
+            background: var(--cor-secundario-bg);
+            color: var(--cor-texto);
+            box-shadow: none;
+        }
+        .paleta-emojis .grupos button[aria-pressed="true"] { background: var(--cor-badge-bg); color: var(--cor-acento-texto); }
+        .paleta-emojis .lista { display: flex; flex-wrap: wrap; gap: 2px; }
+        .paleta-emojis .lista[hidden] { display: none; }
+        .paleta-emojis .lista button {
+            margin: 0;
+            padding: 4px 6px;
+            font-size: 20px;
+            line-height: 1.2;
+            background: transparent;
+            box-shadow: none;
+            border-radius: 8px;
+        }
+        .paleta-emojis .lista button:hover { background: var(--cor-secundario-bg); transform: none; }
+        dialog.confirmacao {
+            border: none;
+            border-radius: 20px;
+            padding: 22px;
+            max-width: 420px;
+            width: calc(100% - 32px);
+            background: var(--cor-superficie);
+            color: var(--cor-texto);
+            box-shadow: 0 24px 60px -20px rgba(0, 0, 0, 0.5);
+        }
+        dialog.confirmacao::backdrop { background: rgba(20, 22, 30, 0.5); }
+        dialog.confirmacao h2 { font-size: 18px; }
+        .acoes-dialogo { display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px; flex-wrap: wrap; }
+        .acoes-dialogo button { margin-top: 0; }
+        .status-poller { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-top: 12px; }
+        .status-poller div { background: var(--cor-secundario-bg); border-radius: 12px; padding: 10px 12px; }
+        .status-poller small { display: block; font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.4px; color: var(--cor-texto-secundario); }
+        .status-poller strong { font-size: 16px; }
+        .status-poller .dica { margin: 0; font-size: 12px; }
+        .ok { color: var(--cor-sucesso); }
+        .ruim { color: var(--cor-erro); }
+        .lista-historico { list-style: none; margin: 8px 0 0; padding: 0; }
+        .lista-historico li { display: flex; align-items: center; gap: 12px; padding: 10px 0; border-top: 1px solid var(--cor-borda); font-size: 13.5px; }
+        .lista-historico li:first-child { border-top: none; }
+        .lista-historico .quando { color: var(--cor-texto-secundario); font-size: 12.5px; width: 84px; flex-shrink: 0; }
+        .lista-historico .texto { flex: 1; min-width: 0; }
+        .lista-historico .texto span { display: block; color: var(--cor-texto-secundario); font-size: 12.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .botao-link {
+            margin: 0;
+            padding: 6px 10px;
+            background: transparent;
+            color: var(--cor-acento-texto);
+            box-shadow: none;
+            font-size: 13px;
+            white-space: nowrap;
+        }
+        .botao-link:hover { background: var(--cor-badge-bg); transform: none; color: var(--cor-acento-texto); }
+        .filtros-logs { display: flex; gap: 6px; flex-wrap: wrap; margin: 12px 0; }
+        .filtros-logs button {
+            margin: 0;
+            padding: 6px 12px;
+            font-size: 12.5px;
+            border-radius: 999px;
+            background: var(--cor-secundario-bg);
+            color: var(--cor-texto);
+            box-shadow: none;
+        }
+        .filtros-logs button[aria-pressed="true"] { background: var(--cor-badge-bg); color: var(--cor-acento-texto); }
+        .etiqueta { font-size: 11px; font-weight: 700; border-radius: 999px; padding: 3px 9px; white-space: nowrap; }
+        .etiqueta.s { background: var(--cor-sucesso-bg); color: var(--cor-sucesso); }
+        .etiqueta.f { background: var(--cor-erro-bg); color: var(--cor-erro); }
+        .etiqueta.v { background: var(--cor-badge-bg); color: var(--cor-acento-texto); }
+        .etiqueta.p { background: var(--cor-secundario-bg); color: var(--cor-texto-secundario); }
+        .etiqueta.a { background: rgba(37, 99, 235, 0.12); color: #2457c5; }
+        .opcao-check { display: flex; align-items: center; gap: 8px; text-transform: none; letter-spacing: 0; font-size: 13px; font-weight: 500; color: var(--cor-texto-secundario); margin: 10px 0 0; }
+        .opcao-check input { width: auto; accent-color: var(--cor-acento); }
     </style>
 </head>
-<body{% if request.endpoint == 'login' %} class="pagina-login"{% elif request.endpoint in ('configuracoes', 'logs') %} class="pagina-larga"{% endif %}>
+{% set logado = session.get('autenticado') %}
+<body class="{% if request.endpoint == 'login' %}pagina-login{% elif request.endpoint in ('configuracoes', 'logs') %}pagina-larga{% elif request.endpoint == 'dashboard' %}pagina-envio{% endif %}{% if logado %} com-menu{% endif %}">
     <header>
         <div class="marca">
             <div class="marca-icone">📣</div>
             <div>
-                <h1>Aviso Broadcaster</h1>
-                <p class="subtitulo">HOTNET</p>
+                <h1>Avisos HOTNET</h1>
+                <p class="subtitulo">Painel</p>
             </div>
         </div>
         <div class="header-direita">
-            {% if session.get('autenticado') %}
-            <nav>
-                <a href="{{ url_for('dashboard') }}" class="{{ 'ativo' if request.endpoint == 'dashboard' }}">Enviar aviso</a>
+            {% if logado %}
+            {# Celular/tela estreita: abas no topo. Tela larga: menu lateral (abaixo). #}
+            <nav class="abas" aria-label="Seções">
+                <a href="{{ url_for('dashboard') }}" class="{{ 'ativo' if request.endpoint == 'dashboard' }}">Enviar</a>
                 <a href="{{ url_for('modelos') }}" class="{{ 'ativo' if request.endpoint == 'modelos' }}">Modelos</a>
                 <a href="{{ url_for('logs') }}" class="{{ 'ativo' if request.endpoint == 'logs' }}">Logs</a>
                 {% if usuario_e_admin %}
                 <a href="{{ url_for('configuracoes') }}" class="{{ 'ativo' if request.endpoint == 'configuracoes' }}">Configurações</a>
                 {% endif %}
-                <a href="{{ url_for('minha_senha') }}" class="{{ 'ativo' if request.endpoint == 'minha_senha' }}">Minha senha</a>
-                <a href="{{ url_for('logout') }}">Sair</a>
             </nav>
+            <details class="menu-usuario">
+                <summary aria-label="Menu da conta">
+                    <span class="avatar-usuario">{{ (session.get('usuario') or '?')[0]|upper }}</span>{{ session.get('usuario') }} ▾
+                </summary>
+                <div class="menu-usuario-itens">
+                    <a href="{{ url_for('minha_senha') }}">🔑 Minha senha</a>
+                    <a href="{{ url_for('logout') }}">↩ Sair</a>
+                </div>
+            </details>
             {% endif %}
             <button type="button" id="botaoTema" class="botao-tema" aria-label="Alternar tema claro/escuro" title="Alternar tema claro/escuro">🌙</button>
         </div>
     </header>
+    <div class="layout">
+    {% if logado %}
+    <nav class="menu-lateral" aria-label="Seções">
+        <a href="{{ url_for('dashboard') }}" class="{{ 'ativo' if request.endpoint == 'dashboard' }}">📣 Enviar aviso</a>
+        <a href="{{ url_for('modelos') }}" class="{{ 'ativo' if request.endpoint == 'modelos' }}">🗂 Modelos</a>
+        <a href="{{ url_for('logs') }}" class="{{ 'ativo' if request.endpoint == 'logs' }}">📜 Logs</a>
+        {% if usuario_e_admin %}
+        <hr>
+        <a href="{{ url_for('configuracoes') }}" class="{{ 'ativo' if request.endpoint == 'configuracoes' }}">⚙ Configurações</a>
+        {% endif %}
+    </nav>
+    {% endif %}
     <main>
         {% with mensagens = get_flashed_messages(with_categories=true) %}
             {% if mensagens %}
@@ -516,6 +769,7 @@
         {% endwith %}
         {% block conteudo %}{% endblock %}
     </main>
+    </div>
     <script>
         (function () {
             // Alternância manual de tema — persiste em localStorage; sem
@@ -550,6 +804,12 @@
             }
             atualizarIconeTema();
         })();
+
+        document.addEventListener('click', function (ev) {
+            document.querySelectorAll('details.menu-usuario[open]').forEach(function (menu) {
+                if (!menu.contains(ev.target)) menu.removeAttribute('open');
+            });
+        });
 
         (function () {
             // Botão de mostrar/ocultar senha em todo campo type=password do

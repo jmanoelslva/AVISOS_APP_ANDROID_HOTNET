@@ -28,6 +28,7 @@ cp -r "$SCRIPT_DIR"/app.py "$SCRIPT_DIR"/config_store.py "$SCRIPT_DIR"/security.
     "$SCRIPT_DIR"/gunicorn.conf.py \
     "$SCRIPT_DIR"/controllr_client.py "$SCRIPT_DIR"/controllr_config.py \
     "$SCRIPT_DIR"/poller.py "$SCRIPT_DIR"/state_store.py \
+    "$SCRIPT_DIR"/access_log.py "$SCRIPT_DIR"/painel_info.py \
     "$INSTALL_DIR"/
 
 if [[ -f "$SCRIPT_DIR/service-account.json" ]]; then

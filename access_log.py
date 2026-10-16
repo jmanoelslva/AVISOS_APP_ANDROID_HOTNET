@@ -9,7 +9,7 @@ LOG_PATH = Path(__file__).resolve().parent / "acessos.log"
 MAX_LINHAS = 500
 
 
-def registrar(evento: str, usuario: str = "", ip: str = "", detalhes: str = "") -> None:
+def registrar(evento: str, usuario: str = "", ip: str = "", detalhes: str = "", mensagem: str = "") -> None:
     entrada = {
         "quando": time.strftime("%Y-%m-%d %H:%M:%S"),
         "evento": evento,
@@ -17,6 +17,9 @@ def registrar(evento: str, usuario: str = "", ip: str = "", detalhes: str = "") 
         "ip": ip,
         "detalhes": detalhes,
     }
+    # Texto do aviso enviado: "Últimos avisos" do painel oferece "Usar de novo".
+    if mensagem:
+        entrada["mensagem"] = mensagem
     linhas = []
     if LOG_PATH.exists():
         with open(LOG_PATH, "r", encoding="utf-8") as f:

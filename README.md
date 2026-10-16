@@ -175,6 +175,15 @@ de evento.
 
 ## 6. Atualizando uma instalação já existente
 
+**Instalação feita com `git clone` direto em `/opt/aviso-broadcaster`** (o
+caso do servidor atual): basta, como root,
+
+```bash
+cd /opt/aviso-broadcaster && git pull
+chown -R aviso-broadcaster: /opt/aviso-broadcaster
+systemctl restart aviso-broadcaster   # só o painel; o poller não precisa
+```
+
 Se você já rodou o `install.sh` antes (e o serviço já está no ar), **não
 precisa reinstalar do zero**. Pra pegar as atualizações mais recentes
 (troca do servidor de desenvolvimento do Flask pelo Gunicorn, aba de
@@ -188,7 +197,7 @@ systemctl stop aviso-broadcaster
 # copie os arquivos atualizados por cima (mantém config.json e
 # service-account.json que já estão lá, não sobrescreve)
 cp app.py config_store.py security.py fcm_sender.py gunicorn.conf.py \
-    requirements.txt /opt/aviso-broadcaster/
+    access_log.py painel_info.py requirements.txt /opt/aviso-broadcaster/
 cp -r templates /opt/aviso-broadcaster/
 
 su -s /bin/bash aviso-broadcaster -c \
