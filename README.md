@@ -101,17 +101,38 @@ diretamente na tela de login.
    `systemctl`; a página leva ao endereço novo. Libere a porta no firewall
    antes. Se algo der errado, edite `port` em `config.json` e rode
    `systemctl restart aviso-broadcaster`.
-5. Pra dar acesso a mais pessoas, use "+ Novo usuário" em
-   Ajustes (pede sua própria senha atual como confirmação). Não
-   dá pra remover a si mesmo nem o último usuário restante, pra evitar
-   ficar todo mundo trancado pra fora. **A página de Ajustes
-   (porta, IPs, gerenciar usuários) só fica visível e acessível pra
-   quem é o usuário administrador** (o primeiro criado, marcado como
-   "admin" na lista) — os demais usuários só veem as abas "Enviar",
-   "Automáticos" (sem poder alterar os lembretes), "Modelos", "Histórico"
-   e "Minha senha".
-6. Qualquer usuário (admin ou não) troca a própria senha em
-   "Minha senha", sem precisar de acesso a Ajustes.
+5. **Usuários e grupos** (Ajustes). Cada usuário pertence a um grupo, e o
+   grupo define o que ele vê e altera:
+
+   | Permissão | O que libera |
+   |---|---|
+   | Enviar aviso geral | Aba Enviar |
+   | Gerenciar modelos | Aba Modelos (criar, editar, excluir) |
+   | Ver automáticos | Aba Automáticos, só leitura |
+   | Alterar lembretes | Salvar os lembretes em Automáticos (inclui Ver automáticos) |
+   | Ver histórico de eventos | Histórico: logins, avisos, alterações, ciclos |
+   | Ver notificações de clientes | Histórico → Notificações (nome, CPF/CNPJ, valores) |
+   | Alterar porta e IPs permitidos | Ajustes → Acesso e rede |
+   | Gerenciar usuários e grupos | Ajustes → Usuários e Grupos (só Administrador) |
+
+   - **Administrador** é fixo: tem todas as permissões, não é editável e
+     precisa ter pelo menos um usuário ativo.
+   - **Atendimento** é criado na atualização para a 1.5.0 com o que os
+     usuários não administradores podiam fazer antes. Pode ser editado.
+   - Outros grupos: "+ Novo grupo", opcionalmente copiando as permissões de
+     um existente. Grupo com usuários não pode ser excluído.
+   - Abas sem permissão somem do topo; o servidor recusa o acesso mesmo por
+     link direto ou formulário montado à mão.
+   - Trocar o grupo ou as permissões vale no próximo clique do usuário.
+     Bloquear ou remover encerra a sessão aberta no próximo clique.
+   - Ninguém bloqueia, remove ou troca o grupo do próprio usuário.
+   - "+ Novo usuário" pede a senha de quem está criando.
+   - Tudo fica registrado no Histórico.
+   - Dados em `config.json`: `grupos` (nome e permissões) e, em cada
+     usuário, `grupo` e `ativo`. `is_admin` continua gravado para permitir
+     voltar à 1.4.x.
+6. Qualquer usuário troca a própria senha em "Minha senha", sem precisar
+   de acesso a Ajustes.
 
 ## 4. Importante — use HTTPS na frente
 

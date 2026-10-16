@@ -49,7 +49,7 @@
         <div class="kpis">
             <div class="kpi"><span class="rotulo">Último ciclo</span><b class="{{ 'ruim' if poller.parado else 'ok' }}">{{ poller.ultimo_hora }}</b><p class="dica">{{ poller.ultimo_relativo }}</p></div>
             <div class="kpi"><span class="rotulo">Próximo</span><b>{{ poller.proximo_hora }}</b><p class="dica">{{ poller.intervalo }}</p></div>
-            <div class="kpi"><span class="rotulo">Falhas 24h</span><b class="{{ 'ruim' if poller.falhas_24h else 'ok' }}">{{ poller.falhas_24h }}</b><p class="dica">{% if poller.falhas_24h %}<a href="{{ url_for('logs') }}#falhas">ver no histórico</a>{% else %}nenhuma{% endif %}</p></div>
+            <div class="kpi"><span class="rotulo">Falhas 24h</span><b class="{{ 'ruim' if poller.falhas_24h else 'ok' }}">{{ poller.falhas_24h }}</b><p class="dica">{% if poller.falhas_24h and 'historico' in pode %}<a href="{{ url_for('logs') }}#falhas">ver no histórico</a>{% elif poller.falhas_24h %}veja com o administrador{% else %}nenhuma{% endif %}</p></div>
         </div>
         {% if poller.parado %}
         <p class="dica ruim"><strong>Os automáticos podem estar parados.</strong> No servidor: <code>systemctl list-timers controllr-poller.timer</code></p>
@@ -68,10 +68,10 @@
     </div>
 
     <div class="card" id="lembretes">
-        <div class="card-titulo"><h2>Lembretes</h2>{% if not usuario_e_admin %}<span class="etiqueta p">Só o administrador altera</span>{% endif %}</div>
+        <div class="card-titulo"><h2>Lembretes</h2>{% if 'lembretes' not in pode %}<span class="etiqueta p">Seu grupo só consulta</span>{% endif %}</div>
         <form method="post">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-            <fieldset {% if not usuario_e_admin %}disabled{% endif %}>
+            <fieldset {% if 'lembretes' not in pode %}disabled{% endif %}>
                 <div class="ajuste">
                     <div><b>Avisar antes do vencimento</b><small>Um aviso por boleto ainda não pago</small></div>
                     <div>
@@ -106,7 +106,7 @@
                     </div>
                 </div>
                 <div class="frase" id="frase" aria-live="polite"></div>
-                {% if usuario_e_admin %}
+                {% if 'lembretes' in pode %}
                 <div class="acoes" style="margin-top:14px"><button type="submit">Salvar lembretes</button><p class="dica">Vale a partir do próximo ciclo, sem reiniciar nada.</p></div>
                 {% endif %}
             </fieldset>

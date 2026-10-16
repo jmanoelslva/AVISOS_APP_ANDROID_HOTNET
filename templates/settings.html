@@ -1,85 +1,192 @@
 {% extends "base.html" %}
 {% block titulo %}Ajustes · Avisos HOTNET{% endblock %}
 {% block estilo %}
-        /* Dois blocos da mesma altura lado a lado (sem sobra de espaço). */
-        .ajustes { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; align-items: stretch; }
+        /* Usuários e Acesso e rede lado a lado, da mesma altura; Grupos na largura toda, embaixo. */
+        .ajustes { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; align-items: stretch; margin-bottom: 16px; }
+        .ajustes.um { grid-template-columns: minmax(0, 1fr); }
         .ajustes > .card { display: flex; flex-direction: column; }
-        .usuarios td { padding: 10px 6px; border-top: 1px solid var(--cor-borda); vertical-align: middle; }
-        .usuarios tr:first-child td { border-top: none; }
+        .usuarios { width: 100%; border-collapse: collapse; font-size: 13px; }
+        .usuarios th { text-align: left; font-size: 11px; text-transform: uppercase; letter-spacing: .05em; color: var(--cor-texto-secundario); padding: 6px; border-bottom: 1px solid var(--cor-borda); }
+        .usuarios td { padding: 9px 6px; border-top: 1px solid var(--cor-borda); vertical-align: middle; }
+        .usuarios tbody tr:first-child td { border-top: none; }
         .usuarios .nome { display: flex; align-items: center; gap: 10px; font-weight: 600; }
-        .usuarios .acao { text-align: right; }
-        .usuarios form { margin: 0; }
-        .ajuste { display: grid; grid-template-columns: 150px minmax(0, 1fr); gap: 14px; padding: 14px 0; border-top: 1px solid var(--cor-borda); align-items: start; }
-        .ajuste:first-of-type { border-top: none; padding-top: 0; }
-        .ajuste > div:first-child b { display: block; font-size: 13.5px; }
-        .ajuste > div:first-child small { color: var(--cor-texto-secundario); font-size: 12px; }
+        .usuarios .acao { text-align: right; white-space: nowrap; }
+        .usuarios form { margin: 0; display: inline; }
+        .usuarios select { width: auto; max-width: 150px; padding: 5px 8px; font-size: 13px; }
+        .usuarios tr.bloqueado .nome { color: var(--cor-texto-secundario); }
+        .matriz { width: 100%; border-collapse: collapse; font-size: 13px; min-width: 520px; }
+        .matriz th { padding: 6px; border-bottom: 1px solid var(--cor-borda); font-size: 11px; text-transform: uppercase; letter-spacing: .05em; color: var(--cor-texto-secundario); text-align: left; vertical-align: bottom; }
+        .matriz th.grupo { text-align: center; text-transform: none; letter-spacing: 0; font-size: 12.5px; color: var(--cor-texto); width: 108px; }
+        .matriz th.grupo small { display: block; font-weight: 500; font-size: 11px; color: var(--cor-texto-secundario); }
+        .matriz td { padding: 8px 6px; border-bottom: 1px solid var(--cor-borda); vertical-align: middle; }
+        .matriz td.perm b { display: block; font-weight: 600; }
+        .matriz td.perm small { color: var(--cor-texto-secundario); font-size: 12px; }
+        .matriz td.caixa { text-align: center; }
+        .matriz input[type=checkbox] { width: 18px; height: 18px; accent-color: var(--cor-acento); cursor: pointer; }
+        .matriz input[type=checkbox]:disabled { cursor: not-allowed; opacity: .7; }
+        .matriz tr.secao td { background: var(--cor-superficie-2); font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; color: var(--cor-texto-secundario); padding-block: 5px; }
+        .sensivel { font-size: 10.5px; font-weight: 700; color: var(--cor-alerta); background: var(--cor-alerta-bg); padding: 1px 6px; border-radius: 999px; margin-left: 6px; }
+        .excluir-grupo { font-size: 11px; padding: 0; margin-top: 2px; }
+        .ajuste + .ajuste { border-top: 1px solid var(--cor-borda); padding-top: 14px; margin-top: 14px; }
+        .matriz td.perm small { display: block; }
+        .ajuste b { display: block; font-size: 13.5px; }
+        .ajuste small { color: var(--cor-texto-secundario); font-size: 12px; display: block; margin-bottom: 8px; }
         .ajuste form { display: grid; gap: 8px; }
         .linha-porta { display: flex; gap: 8px; align-items: center; }
         .linha-porta input { width: 120px; }
-        .rodape-card { margin-top: auto; padding-top: 12px; }
-        @media (max-width: 860px) { .ajustes { grid-template-columns: minmax(0, 1fr); } }
-        @media (max-width: 520px) { .ajuste { grid-template-columns: minmax(0, 1fr); gap: 6px; } }
+        .rodape-card { margin-top: auto; padding-top: 12px; display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+        #statusGrupos { font-size: 12.5px; color: var(--cor-texto-secundario); }
+        @media (max-width: 960px) { .ajustes { grid-template-columns: minmax(0, 1fr); } }
 {% endblock %}
 {% block conteudo %}
 <div class="cabecalho-pagina">
     <div>
         <h1>Ajustes</h1>
-        <p class="dica">Quem entra no painel e de onde. Os lembretes automáticos ficam na aba <a href="{{ url_for('automaticos') }}">Automáticos</a>.</p>
+        <p class="dica">Quem entra no painel, o que cada grupo pode fazer e de onde se acessa.</p>
     </div>
 </div>
 
-<div class="ajustes">
+<div class="ajustes {{ '' if 'usuarios' in pode and 'rede' in pode else 'um' }}">
+{% if 'usuarios' in pode %}
     <section class="card" id="usuarios">
-        <div class="card-titulo"><h2>Usuários do painel</h2><button type="button" class="botao peq" id="botaoNovoUsuario">+ Novo usuário</button></div>
-        <table class="usuarios" style="width:100%;border-collapse:collapse"><tbody>
-            {% for u in usuarios %}
-            <tr>
-                <td><span class="nome"><span class="avatar-usuario">{{ u.username[0]|upper }}</span>{{ u.username }}{% if u.username == usuario_atual %} <span class="dica" style="margin:0">(você)</span>{% endif %}</span></td>
-                <td>{% if u.is_admin %}<span class="etiqueta s">Admin</span>{% else %}<span class="etiqueta p">Envia avisos</span>{% endif %}</td>
-                <td class="acao">
-                    {% if not u.is_admin and u.username != usuario_atual and usuarios|length > 1 %}
-                    <form method="post" onsubmit="return confirm('Remover o usuário {{ u.username }}?')">
-                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                        <input type="hidden" name="acao" value="remover_usuario">
-                        <input type="hidden" name="usuario_remover" value="{{ u.username }}">
-                        <button type="submit" class="botao-link perigo">Remover</button>
-                    </form>
-                    {% endif %}
-                </td>
-            </tr>
-            {% endfor %}
-        </tbody></table>
-        <p class="dica rodape-card">O administrador muda lembretes, usuários e acesso. Os outros enviam avisos e cuidam dos modelos.</p>
+        <div class="card-titulo"><h2>Usuários</h2><button type="button" class="botao peq" id="botaoNovoUsuario">+ Novo usuário</button></div>
+        <div class="rolavel">
+            <table class="usuarios">
+                <thead><tr><th>Usuário</th><th>Grupo</th><th></th></tr></thead>
+                <tbody>
+                {% for u in usuarios %}
+                {% set e_voce = u.username == usuario_atual %}
+                <tr class="{{ '' if u.ativo else 'bloqueado' }}">
+                    <td><span class="nome"><span class="avatar-usuario">{{ u.username[0]|upper }}</span>{{ u.username }}{% if e_voce %} <span class="dica" style="margin:0">(você)</span>{% endif %}{% if not u.ativo %} <span class="etiqueta f">Bloqueado</span>{% endif %}</span></td>
+                    <td>
+                        {% if e_voce %}
+                        <span class="etiqueta {{ 's' if u.grupo == grupo_admin else 'p' }}">{{ u.grupo }}</span>
+                        {% else %}
+                        <form method="post">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                            <input type="hidden" name="acao" value="alterar_grupo">
+                            <input type="hidden" name="usuario" value="{{ u.username }}">
+                            <select name="grupo" aria-label="Grupo de {{ u.username }}" data-envio-automatico>
+                                <option value="{{ grupo_admin }}" {{ 'selected' if u.grupo == grupo_admin }}>{{ grupo_admin }}</option>
+                                {% for g in grupos %}<option value="{{ g.nome }}" {{ 'selected' if u.grupo == g.nome }}>{{ g.nome }}</option>{% endfor %}
+                            </select>
+                            <noscript><button type="submit" class="botao-link">Salvar</button></noscript>
+                        </form>
+                        {% endif %}
+                    </td>
+                    <td class="acao">
+                        {% if not e_voce %}
+                        <form method="post">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                            <input type="hidden" name="acao" value="alternar_bloqueio">
+                            <input type="hidden" name="usuario" value="{{ u.username }}">
+                            <button type="submit" class="botao-link">{{ 'Bloquear' if u.ativo else 'Desbloquear' }}</button>
+                        </form>
+                        <form method="post" data-confirmar="Remover o usuário {{ u.username }}? O histórico dele continua guardado.">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                            <input type="hidden" name="acao" value="remover_usuario">
+                            <input type="hidden" name="usuario" value="{{ u.username }}">
+                            <button type="submit" class="botao-link perigo">Remover</button>
+                        </form>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        <p class="dica rodape-card">Bloquear tira o acesso sem apagar o histórico. Trocar o grupo vale no próximo clique do usuário, sem novo login.</p>
     </section>
-
+{% endif %}
+{% if 'rede' in pode %}
     <section class="card" id="acesso">
         <div class="card-titulo"><h2>Acesso e rede</h2></div>
-        <div class="ajuste">
-            <div><b>Porta</b><small>Ao salvar, o painel reabre sozinho na porta nova</small></div>
-            <form method="post" id="formPorta">
-                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                <input type="hidden" name="acao" value="porta">
-                <div class="linha-porta">
-                    <input type="number" name="porta" id="campoPorta" min="1024" max="65535" value="{{ porta_atual }}" required aria-label="Porta do servidor">
-                    <button type="submit" class="botao-secundario">Salvar e aplicar</button>
-                </div>
-                <p class="dica" style="margin:0">Entre 1024 e 65535. Libere a porta nova no firewall antes de trocar.</p>
-            </form>
-        </div>
-        <div class="ajuste">
-            <div><b>IPs permitidos</b><small>Um por linha. IPv4 ou IPv6, com ou sem faixa (ex.: 203.0.113.0/24, 2001:db8::/32)</small></div>
-            <form method="post">
-                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                <input type="hidden" name="acao" value="acl">
-                <textarea name="allowed_ips" style="min-height:90px" aria-label="IPs permitidos" placeholder="Vazio libera qualquer IP (não recomendado)">{{ allowed_ips }}</textarea>
-                <div class="acoes">
-                    <button type="submit" class="botao-secundario">Salvar lista</button>
-                    {% if not allowed_ips %}<span class="etiqueta al">Sem restrição de IP</span>{% else %}<span class="etiqueta s">Restrito</span>{% endif %}
-                </div>
-            </form>
+        <div>
+            <div class="ajuste">
+                <b>Porta</b><small>Ao salvar, o painel reabre sozinho na porta nova</small>
+                <form method="post" id="formPorta">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <input type="hidden" name="acao" value="porta">
+                    <div class="linha-porta">
+                        <input type="number" name="porta" id="campoPorta" min="1024" max="65535" value="{{ porta_atual }}" required aria-label="Porta do servidor">
+                        <button type="submit" class="botao-secundario">Salvar e aplicar</button>
+                    </div>
+                    <p class="dica" style="margin:0">Entre 1024 e 65535. Libere a porta nova no firewall antes de trocar.</p>
+                </form>
+            </div>
+            <div class="ajuste">
+                <b>IPs permitidos</b><small>Um por linha. IPv4 ou IPv6, com ou sem faixa (ex.: 203.0.113.0/24, 2001:db8::/32)</small>
+                <form method="post">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <input type="hidden" name="acao" value="acl">
+                    <textarea name="allowed_ips" style="min-height:90px" aria-label="IPs permitidos" placeholder="Vazio libera qualquer IP (não recomendado)">{{ allowed_ips }}</textarea>
+                    <div class="acoes">
+                        <button type="submit" class="botao-secundario">Salvar lista</button>
+                        {% if not allowed_ips %}<span class="etiqueta al">Sem restrição de IP</span>{% else %}<span class="etiqueta s">Restrito</span>{% endif %}
+                    </div>
+                </form>
+            </div>
         </div>
     </section>
+{% endif %}
 </div>
+
+{% if 'usuarios' in pode %}
+    <section class="card" id="grupos">
+        <div class="card-titulo"><h2>Grupos e permissões</h2><button type="button" class="botao-secundario peq" id="botaoNovoGrupo">+ Novo grupo</button></div>
+        <form method="post" id="formGrupos">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <input type="hidden" name="acao" value="salvar_grupos">
+            {% for g in grupos %}<input type="hidden" name="grupo_nome" value="{{ g.nome }}">{% endfor %}
+            <div class="rolavel">
+                <table class="matriz">
+                    <thead>
+                        <tr>
+                            <th>Permissão</th>
+                            <th class="grupo">{{ grupo_admin }}<small>{{ contagem_grupos[grupo_admin] }} usuário{{ '' if contagem_grupos[grupo_admin] == 1 else 's' }}</small></th>
+                            {% for g in grupos %}
+                            {% set n = contagem_grupos[g.nome] %}
+                            <th class="grupo">{{ g.nome }}<small>{{ n }} usuário{{ '' if n == 1 else 's' }}</small>
+                                {% if n == 0 %}<button type="submit" form="excluirGrupo{{ loop.index0 }}" class="botao-link perigo excluir-grupo">Excluir</button>{% endif %}
+                            </th>
+                            {% endfor %}
+                        </tr>
+                    </thead>
+                    <tbody>
+                    {% for secao, itens in secoes %}
+                        <tr class="secao"><td colspan="{{ grupos|length + 2 }}">{{ secao }}</td></tr>
+                        {% for pid, nome, desc, sensivel in itens %}
+                        <tr>
+                            <td class="perm"><b>{{ nome }}{% if sensivel %}<span class="sensivel">dados de clientes</span>{% endif %}</b><small>{{ desc }}</small></td>
+                            <td class="caixa"><input type="checkbox" checked disabled aria-label="{{ nome }} para {{ grupo_admin }}"></td>
+                            {% for g in grupos %}
+                            <td class="caixa"><input type="checkbox" name="perm" value="{{ loop.index0 }}:{{ pid }}" data-perm="{{ pid }}" data-grupo="{{ loop.index0 }}"
+                                {{ 'checked' if pid in g.permissoes }} {{ 'disabled' if pid in so_admin }} aria-label="{{ nome }} para {{ g.nome }}"></td>
+                            {% endfor %}
+                        </tr>
+                        {% endfor %}
+                    {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </form>
+        <div class="rodape-card">
+            <button type="submit" form="formGrupos" {{ 'disabled' if not grupos }}>Salvar permissões</button>
+            <span id="statusGrupos">{{ grupo_admin }} tem todas as permissões e não pode ser editado.</span>
+        </div>
+        {% for g in grupos %}
+        {% if contagem_grupos[g.nome] == 0 %}
+        <form method="post" id="excluirGrupo{{ loop.index0 }}" data-confirmar="Excluir o grupo {{ g.nome }}?" hidden>
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <input type="hidden" name="acao" value="excluir_grupo">
+            <input type="hidden" name="nome_grupo" value="{{ g.nome }}">
+        </form>
+        {% endif %}
+        {% endfor %}
+    </section>
+{% endif %}
+
+{% if 'rede' in pode %}
 
 <dialog class="janela" id="janelaPorta" aria-labelledby="tituloPorta">
     <h2 id="tituloPorta">Mudar o painel para a porta <span id="portaNova"></span>?</h2>
@@ -90,14 +197,21 @@
         <button type="button" class="botao" id="confirmarPorta">Mudar e reiniciar</button>
     </div>
 </dialog>
+{% endif %}
 
+{% if 'usuarios' in pode %}
 <dialog class="janela" id="janelaUsuario" aria-labelledby="tituloNovoUsuario">
     <h2 id="tituloNovoUsuario">Novo usuário</h2>
-    <p class="dica">Ele poderá enviar avisos e cuidar dos modelos.</p>
     <form method="post" class="formulario" id="formNovoUsuario">
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <input type="hidden" name="acao" value="novo_usuario">
         <div><label class="rotulo" for="novoNome">Nome de usuário</label><input type="text" id="novoNome" name="novo_usuario_nome" required maxlength="60" autocomplete="off"></div>
+        <div><label class="rotulo" for="novoGrupo">Grupo</label>
+            <select id="novoGrupo" name="novo_usuario_grupo" required>
+                {% for g in grupos %}<option value="{{ g.nome }}" {{ 'selected' if g.nome == grupo_padrao }}>{{ g.nome }}</option>{% endfor %}
+                <option value="{{ grupo_admin }}" {{ 'selected' if not grupos }}>{{ grupo_admin }} (todas as permissões)</option>
+            </select>
+        </div>
         <div><label class="rotulo" for="novaSenha">Senha</label><input type="password" id="novaSenha" name="novo_usuario_senha" required minlength="8" autocomplete="new-password"></div>
         <div><label class="rotulo" for="novaConfirmacao">Confirmar senha</label><input type="password" id="novaConfirmacao" name="novo_usuario_confirmacao" required minlength="8" autocomplete="new-password"></div>
         <p class="dica" style="margin:0">Mínimo 8 caracteres, com maiúscula, minúscula, número e caractere especial.</p>
@@ -109,35 +223,84 @@
     </div>
 </dialog>
 
+<dialog class="janela" id="janelaGrupo" aria-labelledby="tituloNovoGrupo">
+    <h2 id="tituloNovoGrupo">Novo grupo</h2>
+    <form method="post" class="formulario" id="formNovoGrupo">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <input type="hidden" name="acao" value="novo_grupo">
+        <div><label class="rotulo" for="nomeGrupo">Nome do grupo</label><input type="text" id="nomeGrupo" name="nome_grupo" required minlength="2" maxlength="30" autocomplete="off" placeholder="Ex.: Financeiro"></div>
+        <div><label class="rotulo" for="baseGrupo">Começar com as permissões de</label>
+            <select id="baseGrupo" name="base_grupo">
+                <option value="">Nenhuma</option>
+                {% for g in grupos %}<option value="{{ g.nome }}">{{ g.nome }}</option>{% endfor %}
+                <option value="{{ grupo_admin }}">{{ grupo_admin }} (menos gerenciar usuários)</option>
+            </select>
+        </div>
+        <p class="dica" style="margin:0">Depois de criado, ajuste as caixas na tabela e clique em Salvar permissões.</p>
+    </form>
+    <div class="acoes-dialogo">
+        <button type="button" class="botao-secundario" id="cancelarNovoGrupo">Cancelar</button>
+        <button type="submit" form="formNovoGrupo">Criar grupo</button>
+    </div>
+</dialog>
+{% endif %}
+
 <script>
     (function () {
-        var janela = document.getElementById('janelaUsuario');
-        document.getElementById('botaoNovoUsuario').addEventListener('click', function () {
+        function abrir(janela, foco) {
             if (typeof janela.showModal === 'function') janela.showModal(); else janela.setAttribute('open', '');
-            document.getElementById('novoNome').focus();
+            if (foco) foco.focus();
+        }
+        function ligarJanela(botao, janela, cancelar, form, foco) {
+            if (!botao) return;
+            botao.addEventListener('click', function () { abrir(janela, foco); });
+            cancelar.addEventListener('click', function () { form.reset(); janela.close(); });
+        }
+        ligarJanela(document.getElementById('botaoNovoUsuario'), document.getElementById('janelaUsuario'),
+            document.getElementById('cancelarNovoUsuario'), document.getElementById('formNovoUsuario'), document.getElementById('novoNome'));
+        ligarJanela(document.getElementById('botaoNovoGrupo'), document.getElementById('janelaGrupo'),
+            document.getElementById('cancelarNovoGrupo'), document.getElementById('formNovoGrupo'), document.getElementById('nomeGrupo'));
+
+        // Trocar o grupo na lista salva na hora.
+        document.querySelectorAll('[data-envio-automatico]').forEach(function (s) {
+            s.addEventListener('change', function () { s.form.submit(); });
         });
-        // Troca de porta: confirma antes, porque derruba o endereço atual.
-        var formPorta = document.getElementById('formPorta'), janelaPorta = document.getElementById('janelaPorta');
-        var confirmada = false;
-        formPorta.addEventListener('submit', function (ev) {
-            var valor = document.getElementById('campoPorta').value;
-            if (confirmada || valor === '{{ porta_atual }}' || typeof janelaPorta.showModal !== 'function') return;
-            ev.preventDefault();
-            document.getElementById('portaNova').textContent = valor;
-            janelaPorta.showModal();
-        });
-        document.getElementById('cancelarPorta').addEventListener('click', function () { janelaPorta.close(); });
-        document.getElementById('confirmarPorta').addEventListener('click', function () {
-            confirmada = true;
-            this.disabled = true;
-            this.textContent = 'Reiniciando…';
-            formPorta.submit();
+        // Remover usuário e excluir grupo pedem confirmação.
+        document.querySelectorAll('form[data-confirmar]').forEach(function (f) {
+            f.addEventListener('submit', function (ev) { if (!confirm(f.dataset.confirmar)) ev.preventDefault(); });
         });
 
-        document.getElementById('cancelarNovoUsuario').addEventListener('click', function () {
-            document.getElementById('formNovoUsuario').reset();
-            janela.close();
-        });
+        // "Alterar lembretes" exige "Ver automáticos" (o servidor também garante).
+        var formGrupos = document.getElementById('formGrupos'), status = document.getElementById('statusGrupos');
+        if (formGrupos) {
+            formGrupos.addEventListener('change', function (ev) {
+                var c = ev.target, g = c.dataset.grupo;
+                function caixa(perm) { return formGrupos.querySelector('input[data-grupo="' + g + '"][data-perm="' + perm + '"]'); }
+                if (c.dataset.perm === 'lembretes' && c.checked) caixa('ver_automaticos').checked = true;
+                if (c.dataset.perm === 'ver_automaticos' && !c.checked) caixa('lembretes').checked = false;
+                status.textContent = 'Alterações não salvas.';
+            });
+        }
+
+        // Troca de porta: confirma antes, porque derruba o endereço atual.
+        var formPorta = document.getElementById('formPorta'), janelaPorta = document.getElementById('janelaPorta');
+        if (formPorta) {
+            var confirmada = false;
+            formPorta.addEventListener('submit', function (ev) {
+                var valor = document.getElementById('campoPorta').value;
+                if (confirmada || valor === '{{ porta_atual }}' || typeof janelaPorta.showModal !== 'function') return;
+                ev.preventDefault();
+                document.getElementById('portaNova').textContent = valor;
+                janelaPorta.showModal();
+            });
+            document.getElementById('cancelarPorta').addEventListener('click', function () { janelaPorta.close(); });
+            document.getElementById('confirmarPorta').addEventListener('click', function () {
+                confirmada = true;
+                this.disabled = true;
+                this.textContent = 'Reiniciando…';
+                formPorta.submit();
+            });
+        }
     })();
 </script>
 {% endblock %}

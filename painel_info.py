@@ -23,6 +23,13 @@ _EVENTOS = {
     "senha_alterada": ("Senha alterada", {"acessos"}, "a"),
     "lembretes_alterados": ("Lembretes alterados", {"acessos"}, "a"),
     "porta_alterada": ("Porta alterada", {"acessos"}, "a"),
+    "ips_alterados": ("IPs permitidos alterados", {"acessos"}, "a"),
+    "usuario_grupo_alterado": ("Grupo do usuário alterado", {"acessos"}, "a"),
+    "usuario_bloqueado": ("Usuário bloqueado", {"acessos"}, "a"),
+    "usuario_desbloqueado": ("Usuário desbloqueado", {"acessos"}, "a"),
+    "grupo_criado": ("Grupo criado", {"acessos"}, "a"),
+    "grupo_excluido": ("Grupo excluído", {"acessos"}, "a"),
+    "permissoes_alteradas": ("Permissões alteradas", {"acessos"}, "a"),
     "poller_ciclo": ("Ciclo automático", {"poller"}, "p"),
     "poller_falha": ("Falha automática", {"poller", "falhas"}, "f"),
 }

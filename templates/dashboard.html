@@ -108,7 +108,7 @@
 </div>
 
 <div class="card" style="margin-top:16px">
-    <div class="card-titulo"><h2>Últimos avisos enviados</h2><a class="link" href="{{ url_for('logs') }}">Ver histórico</a></div>
+    <div class="card-titulo"><h2>Últimos avisos enviados</h2>{% if 'historico' in pode %}<a class="link" href="{{ url_for('logs') }}">Ver histórico</a>{% endif %}</div>
     {% if ultimos_avisos %}
     <div class="rolavel">
         <table class="tabela ultimos"><tbody>

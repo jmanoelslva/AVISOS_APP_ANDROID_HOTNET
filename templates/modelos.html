@@ -34,7 +34,7 @@
         {% if t.titulo and t.titulo != 'Aviso da HOTNET' %}<span class="titulo-notif">{{ t.titulo }}</span>{% endif %}
         <p>{{ t.mensagem }}</p>
         <div class="pe">
-            <a class="botao-secundario peq" href="{{ url_for('dashboard', modelo=t.id) }}">Usar</a>
+            {% if 'enviar' in pode %}<a class="botao-secundario peq" href="{{ url_for('dashboard', modelo=t.id) }}">Usar</a>{% endif %}
             <button type="button" class="botao-link editar-modelo-btn"
                     data-id="{{ t.id }}" data-nome="{{ t.nome }}" data-titulo="{{ t.titulo }}" data-mensagem="{{ t.mensagem }}">Editar</button>
             <form method="post" onsubmit="return confirm('Remover o modelo “{{ t.nome }}”?')">

@@ -58,12 +58,14 @@
 <div class="card">
     <div class="ferramentas">
         <div class="segmentado" role="group" aria-label="Filtrar por tipo">
+            {% if 'historico' in pode %}
             <button type="button" data-filtro="" aria-pressed="true">Tudo</button>
             <button type="button" data-filtro="avisos" aria-pressed="false">Avisos</button>
             <button type="button" data-filtro="acessos" aria-pressed="false">Acessos</button>
             <button type="button" data-filtro="poller" aria-pressed="false">Automáticos</button>
-            <button type="button" data-filtro="notificacoes" aria-pressed="false">Notificações</button>
-            <button type="button" data-filtro="falhas" aria-pressed="false">Falhas · {{ total_falhas }}</button>
+            {% endif %}
+            {% if 'notificacoes' in pode %}<button type="button" data-filtro="notificacoes" aria-pressed="false">Notificações</button>{% endif %}
+            {% if 'historico' in pode %}<button type="button" data-filtro="falhas" aria-pressed="false">Falhas · {{ total_falhas }}</button>{% endif %}
         </div>
         <input type="search" id="filtroLogs" placeholder="Buscar usuário, IP ou texto" aria-label="Buscar no histórico">
         <label class="opcao-check" id="opcaoCiclos"><input type="checkbox" id="mostrarCiclosVazios"> Ciclos sem notificação</label>
@@ -246,7 +248,12 @@
 
         // Link "ver no histórico" das falhas (Automáticos) chega com #falhas.
         var inicial = location.hash.replace('#', '');
-        escolher(['avisos', 'acessos', 'poller', 'notificacoes', 'falhas'].indexOf(inicial) >= 0 ? inicial : '');
+        var podeHistorico = {{ 'true' if 'historico' in pode else 'false' }};
+        var podeNotificacoes = {{ 'true' if 'notificacoes' in pode else 'false' }};
+        if (['avisos', 'acessos', 'poller', 'notificacoes', 'falhas'].indexOf(inicial) < 0) inicial = '';
+        if (!podeHistorico) inicial = 'notificacoes';
+        else if (!podeNotificacoes && inicial === 'notificacoes') inicial = '';
+        escolher(inicial);
     })();
 </script>
 {% endblock %}

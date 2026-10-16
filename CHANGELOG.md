@@ -11,6 +11,35 @@ systemctl restart aviso-broadcaster
 ```
 O poller roda por timer e usa o código novo no ciclo seguinte, sem reinício.
 
+## [1.5.0] - 2026-10-16
+Partes: painel.
+
+### Adicionado
+- Grupos de usuários com permissões, em Ajustes → Grupos e permissões. Permissões: enviar aviso geral, gerenciar modelos, ver automáticos, alterar lembretes, ver histórico de eventos, ver notificações de clientes, alterar porta e IPs, gerenciar usuários e grupos.
+- Grupo Administrador fixo, com todas as permissões e ao menos um usuário ativo.
+- Criar grupo, inclusive copiando outro; excluir grupo sem usuários.
+- Trocar o grupo de um usuário pela lista; bloquear e desbloquear usuário.
+- Grupo na criação de usuário.
+- Histórico registra: grupo criado/excluído, permissões alteradas, grupo do usuário alterado, usuário bloqueado/desbloqueado, IPs permitidos alterados.
+- `permissoes.py`.
+
+### Alterado
+- Permissões conferidas no servidor em cada rota e ação (antes: só administrador × demais).
+- Abas e botões aparecem conforme as permissões do grupo; o login leva à primeira aba permitida.
+- Histórico entrega eventos e notificações de clientes só a quem tem a permissão correspondente.
+- Ajustes: Usuários e Acesso e rede lado a lado; Grupos e permissões abaixo, na largura toda.
+- Administrador pode ser removido, bloqueado ou movido por outro administrador, desde que reste um ativo.
+- `install.sh` copia `permissoes.py` e grava o primeiro usuário no grupo Administrador.
+
+### Segurança
+- Sessão de usuário removido ou bloqueado é encerrada no próximo pedido (antes continuava válida até expirar).
+- Usuário bloqueado não consegue entrar.
+- A permissão de gerenciar usuários e grupos não pode ser dada a outros grupos.
+
+### Migração
+- Automática no primeiro carregamento: administradores → Administrador; demais → Atendimento (enviar, modelos, ver automáticos, histórico, notificações), sem mudança de acesso.
+- `is_admin` continua gravado; voltar à 1.4.x mantém os administradores.
+
 ## [1.4.1] - 2026-10-16
 Partes: poller.
 
@@ -109,6 +138,7 @@ Partes: painel e poller. Estado em produção desde o piloto.
 - `invoice_valid=false` é pagamento manual no escritório, não cliente inativo.
 - Pagamento confirmado usa `invoice_amount_paid` em vez de `invoice_amount_document`.
 
+[1.5.0]: https://github.com/jmanoelslva/AVISOS_APP_ANDROID_HOTNET/compare/v1.4.1...v1.5.0
 [1.4.1]: https://github.com/jmanoelslva/AVISOS_APP_ANDROID_HOTNET/compare/v1.4.0...v1.4.1
 [1.4.0]: https://github.com/jmanoelslva/AVISOS_APP_ANDROID_HOTNET/compare/v1.3.0...v1.4.0
 [1.3.0]: https://github.com/jmanoelslva/AVISOS_APP_ANDROID_HOTNET/compare/v1.2.1...v1.3.0

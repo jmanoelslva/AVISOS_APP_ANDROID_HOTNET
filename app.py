@@ -17,6 +17,7 @@ import envios_log
 import config_store
 import lembretes
 import painel_info
+import permissoes
 from fcm_sender import enviar_aviso
 from security import validar_forca_senha
 
@@ -93,6 +94,12 @@ def login_obrigatorio(f):
         if not session.get("autenticado") or not session.get("usuario"):
             session.clear()
             return redirect(url_for("login"))
+        # Usuário removido ou bloqueado perde a sessão já aberta no próximo clique.
+        entrada = _entrada_usuario_logado(config_store.carregar())
+        if not entrada or not entrada.get("ativo", True):
+            session.clear()
+            flash("Seu acesso ao painel foi encerrado. Fale com o administrador.", "erro")
+            return redirect(url_for("login"))
         return f(*args, **kwargs)
     return wrapper
 
@@ -104,28 +111,53 @@ def _entrada_usuario_logado(cfg: dict) -> dict | None:
     )
 
 
-def admin_obrigatorio(f):
-    @wraps(f)
-    def wrapper(*args, **kwargs):
-        cfg = config_store.carregar()
-        entrada = _entrada_usuario_logado(cfg)
-        if not entrada or not entrada.get("is_admin"):
-            flash("Apenas o administrador tem acesso a essa página.", "erro")
-            return redirect(url_for("dashboard"))
-        return f(*args, **kwargs)
-    return wrapper
+def _permissoes_logado() -> set[str]:
+    cfg = config_store.carregar()
+    return permissoes.do_usuario(cfg, _entrada_usuario_logado(cfg))
+
+
+# Primeira página que o grupo pode abrir (login e logotipo levam para ela).
+_PAGINAS = [
+    ("enviar", "dashboard"), ("ver_automaticos", "automaticos"), ("modelos", "modelos"),
+    ("historico", "logs"), ("notificacoes", "logs"), ("usuarios", "configuracoes"), ("rede", "configuracoes"),
+]
+
+
+def _pagina_inicial(perms: set[str]) -> str:
+    for perm, endpoint in _PAGINAS:
+        if perm in perms:
+            return url_for(endpoint)
+    return url_for("minha_senha")
+
+
+def requer(*aceitas: str):
+    """Exige pelo menos uma das permissões (permissoes.py). Conferido no servidor a
+    cada pedido, inclusive POST: esconder a aba não basta."""
+    def decorador(f):
+        @wraps(f)
+        def wrapper(*args, **kwargs):
+            perms = _permissoes_logado()
+            if not perms.intersection(aceitas):
+                flash("Seu grupo não tem acesso a essa página.", "erro")
+                return redirect(_pagina_inicial(perms))
+            return f(*args, **kwargs)
+        return wrapper
+    return decorador
 
 
 @app.context_processor
-def injetar_usuario_e_admin():
+def injetar_usuario_e_permissoes():
     cfg = config_store.carregar()
     entrada = _entrada_usuario_logado(cfg)
+    perms = permissoes.do_usuario(cfg, entrada) if session.get("autenticado") else set()
     # Selo "Automáticos ok · 18:01" no topo de todas as páginas (U9).
     status = None
-    if session.get("autenticado"):
+    if "ver_automaticos" in perms:
         status = painel_info.status_topo(access_log.listar(limite=access_log.MAX_LINHAS))
     return {
-        "usuario_e_admin": bool(entrada and entrada.get("is_admin")),
+        "pode": perms,
+        "usuario_e_admin": bool(entrada and entrada.get("grupo") == permissoes.GRUPO_ADMIN),
+        "pagina_inicial": _pagina_inicial(perms) if perms else url_for("login"),
         "emojis": painel_info.EMOJIS,
         "status_topo": status,
     }
@@ -190,11 +222,16 @@ def login():
             (u for u in cfg.get("usuarios", []) if u["username"] == usuario), None
         )
         if entrada and check_password_hash(entrada["password_hash"], senha):
+            if not entrada.get("ativo", True):
+                access_log.registrar("login_falha", usuario=usuario, ip=ip, detalhes="usuário bloqueado")
+                flash("Usuário bloqueado. Fale com o administrador do painel.", "erro")
+                return render_template("login.html", primeira_vez=primeira_vez)
+            session.clear()
             session["autenticado"] = True
             session["usuario"] = usuario
             _tentativas_login.pop(ip, None)
             access_log.registrar("login_sucesso", usuario=usuario, ip=ip)
-            return redirect(url_for("dashboard"))
+            return redirect(_pagina_inicial(permissoes.do_usuario(cfg, entrada)))
 
         contagem, _ = _tentativas_login.get(ip, (0, 0.0))
         contagem += 1
@@ -232,7 +269,9 @@ def definir_senha_inicial():
     cfg["usuarios"] = [{
         "username": usuario,
         "password_hash": generate_password_hash(senha),
+        "grupo": permissoes.GRUPO_ADMIN,
         "is_admin": True,
+        "ativo": True,
     }]
     config_store.salvar(cfg)
     access_log.registrar("usuario_criado", usuario=usuario, ip=_ip_do_cliente(), detalhes="primeiro usuário (admin)")
@@ -248,6 +287,7 @@ def logout():
 
 @app.route("/", methods=["GET", "POST"])
 @login_obrigatorio
+@requer("enviar")
 def dashboard():
     if request.method == "POST":
         titulo = request.form.get("titulo", "").strip() or "Aviso da HOTNET"
@@ -294,6 +334,7 @@ def dashboard():
 
 @app.route("/modelos", methods=["GET", "POST"])
 @login_obrigatorio
+@requer("modelos")
 def modelos():
     cfg = config_store.carregar()
 
@@ -353,16 +394,15 @@ def modelos():
 
 @app.route("/automaticos", methods=["GET", "POST"])
 @login_obrigatorio
+@requer("ver_automaticos")
 def automaticos():
     """Notificações que o poller manda sozinho: funcionamento, contagem do dia e
-    lembretes (antecedência e horário). Todos veem; só o admin altera."""
+    lembretes (antecedência e horário). Alterar exige a permissão "lembretes"."""
     cfg = config_store.carregar()
-    entrada = _entrada_usuario_logado(cfg)
-    e_admin = bool(entrada and entrada.get("is_admin"))
 
     if request.method == "POST":
-        if not e_admin:
-            flash("Apenas o administrador pode alterar os lembretes.", "erro")
+        if "lembretes" not in _permissoes_logado():
+            flash("Seu grupo não pode alterar os lembretes.", "erro")
             return redirect(url_for("automaticos"))
         novo, erro = lembretes.validar_formulario(
             request.form.get("dias_antes"),
@@ -395,10 +435,16 @@ def automaticos():
 
 @app.route("/logs")
 @login_obrigatorio
+@requer("historico", "notificacoes")
 def logs():
-    eventos = painel_info.eventos_para_tabela(access_log.listar(limite=access_log.MAX_LINHAS))
+    perms = _permissoes_logado()
+    eventos, envios = [], []
+    if "historico" in perms:
+        eventos = painel_info.eventos_para_tabela(access_log.listar(limite=access_log.MAX_LINHAS))
     falhas = sum(1 for e in eventos if "falhas" in e["categorias"].split())
-    envios = painel_info.envios_para_tabela(envios_log.listar())
+    # Nome e CPF de clientes: só com a permissão "notificacoes".
+    if "notificacoes" in perms:
+        envios = painel_info.envios_para_tabela(envios_log.listar())
     return render_template("logs.html", eventos=eventos, total_falhas=falhas, envios=envios,
                            dias_envios=envios_log.DIAS_RETENCAO)
 
@@ -432,68 +478,190 @@ def minha_senha():
     return render_template("minha_senha.html", usuario_atual=usuario_logado)
 
 
+_ACOES_USUARIOS = {
+    "novo_usuario", "remover_usuario", "alterar_grupo", "alternar_bloqueio",
+    "salvar_grupos", "novo_grupo", "excluir_grupo",
+}
+_ACOES_REDE = {"porta", "acl"}
+_NOMES_PERMISSOES = {p[0]: p[1] for _, itens in permissoes.SECOES for p in itens}
+
+
+def _achar_usuario(cfg: dict, nome: str) -> dict | None:
+    return next((u for u in cfg.get("usuarios", []) if u["username"] == nome), None)
+
+
+def _grupo_existe(cfg: dict, nome: str) -> bool:
+    return nome == permissoes.GRUPO_ADMIN or any(g["nome"] == nome for g in cfg.get("grupos", []))
+
+
+def _ultimo_admin(cfg: dict, entrada: dict) -> bool:
+    """True se tirar este usuário do Administrador deixaria o painel sem admin ativo."""
+    return (entrada.get("grupo") == permissoes.GRUPO_ADMIN and entrada.get("ativo", True)
+            and len(permissoes.admins_ativos(cfg)) <= 1)
+
+
+def _acao_usuarios(cfg: dict, acao: str, usuario_logado: str, entrada_logada: dict, ip: str) -> None:
+    def registrar(evento: str, detalhes: str) -> None:
+        access_log.registrar(evento, usuario=usuario_logado, ip=ip, detalhes=detalhes)
+
+    if acao == "novo_usuario":
+        senha_confirmacao = request.form.get("senha_atual_novo_usuario", "")
+        if not check_password_hash(entrada_logada["password_hash"], senha_confirmacao):
+            flash("Sua senha atual está incorreta — confirmação necessária pra criar um novo usuário.", "erro")
+            return
+        novo_nome = request.form.get("novo_usuario_nome", "").strip()
+        nova_senha = request.form.get("novo_usuario_senha", "")
+        nova_confirmacao = request.form.get("novo_usuario_confirmacao", "")
+        grupo = request.form.get("novo_usuario_grupo", "")
+        problemas = validar_forca_senha(nova_senha)
+        if not novo_nome:
+            problemas.append("informe um nome de usuário")
+        elif _achar_usuario(cfg, novo_nome):
+            problemas.append("esse nome de usuário já existe")
+        if nova_senha != nova_confirmacao:
+            problemas.append("as senhas não coincidem")
+        if not _grupo_existe(cfg, grupo):
+            problemas.append("escolha um grupo")
+        if problemas:
+            flash("Não atende aos requisitos: " + ", ".join(problemas), "erro")
+            return
+        cfg.setdefault("usuarios", []).append({
+            "username": novo_nome,
+            "password_hash": generate_password_hash(nova_senha),
+            "grupo": grupo,
+            "is_admin": grupo == permissoes.GRUPO_ADMIN,
+            "ativo": True,
+        })
+        config_store.salvar(cfg)
+        registrar("usuario_criado", f"{novo_nome} ({grupo})")
+        flash(f"Usuário \"{novo_nome}\" criado no grupo {grupo}.", "sucesso")
+        return
+
+    if acao in ("remover_usuario", "alterar_grupo", "alternar_bloqueio"):
+        alvo = request.form.get("usuario", "")
+        entrada_alvo = _achar_usuario(cfg, alvo)
+        if not entrada_alvo:
+            flash("Usuário não encontrado.", "erro")
+            return
+        if alvo == usuario_logado:
+            flash("Você não pode remover, bloquear nem trocar o grupo do seu próprio usuário.", "erro")
+            return
+
+        if acao == "remover_usuario":
+            if _ultimo_admin(cfg, entrada_alvo):
+                flash("Esse é o único administrador ativo. Coloque outro usuário no grupo Administrador antes.", "erro")
+                return
+            cfg["usuarios"] = [u for u in cfg["usuarios"] if u["username"] != alvo]
+            config_store.salvar(cfg)
+            registrar("usuario_removido", alvo)
+            flash(f"Usuário \"{alvo}\" removido.", "sucesso")
+
+        elif acao == "alterar_grupo":
+            novo = request.form.get("grupo", "")
+            antigo = entrada_alvo.get("grupo")
+            if not _grupo_existe(cfg, novo):
+                flash("Grupo não encontrado.", "erro")
+            elif novo == antigo:
+                return
+            elif _ultimo_admin(cfg, entrada_alvo):
+                flash("Esse é o único administrador ativo. Coloque outro usuário no grupo Administrador antes.", "erro")
+            else:
+                entrada_alvo["grupo"] = novo
+                entrada_alvo["is_admin"] = novo == permissoes.GRUPO_ADMIN
+                config_store.salvar(cfg)
+                registrar("usuario_grupo_alterado", f"{alvo}: {antigo} → {novo}")
+                flash(f"\"{alvo}\" agora está no grupo {novo}. Vale a partir do próximo clique dele.", "sucesso")
+
+        else:  # alternar_bloqueio
+            if entrada_alvo.get("ativo", True):
+                if _ultimo_admin(cfg, entrada_alvo):
+                    flash("Esse é o único administrador ativo e não pode ser bloqueado.", "erro")
+                    return
+                entrada_alvo["ativo"] = False
+                registrar("usuario_bloqueado", alvo)
+                flash(f"\"{alvo}\" bloqueado. A sessão dele, se aberta, cai no próximo clique.", "sucesso")
+            else:
+                entrada_alvo["ativo"] = True
+                registrar("usuario_desbloqueado", alvo)
+                flash(f"\"{alvo}\" desbloqueado.", "sucesso")
+            config_store.salvar(cfg)
+        return
+
+    grupos = cfg.setdefault("grupos", [])
+    if acao == "salvar_grupos":
+        # Caixas marcadas chegam como "<índice>:<permissão>"; o índice aponta para os
+        # nomes enviados em "grupo_nome", na ordem em que a tabela foi desenhada.
+        nomes = request.form.getlist("grupo_nome")
+        marcadas: dict[str, list[str]] = {nome: [] for nome in nomes}
+        for valor in request.form.getlist("perm"):
+            indice, _, perm = valor.partition(":")
+            if indice.isdigit() and int(indice) < len(nomes):
+                marcadas[nomes[int(indice)]].append(perm)
+        mudancas = []
+        for g in grupos:
+            if g["nome"] not in marcadas:
+                continue
+            limpas = permissoes.limpar(marcadas[g["nome"]])
+            if limpas != g.get("permissoes"):
+                g["permissoes"] = limpas
+                lista = ", ".join(_NOMES_PERMISSOES[p] for p in limpas) or "nenhuma"
+                mudancas.append(f"{g['nome']}: {lista}")
+        if mudancas:
+            config_store.salvar(cfg)
+            registrar("permissoes_alteradas", "; ".join(mudancas))
+            flash("Permissões salvas. Valem a partir do próximo clique de cada usuário.", "sucesso")
+        else:
+            flash("Nenhuma permissão mudou.", "sucesso")
+
+    elif acao == "novo_grupo":
+        nome = request.form.get("nome_grupo", "").strip()
+        erro = permissoes.validar_nome(nome, grupos)
+        if erro:
+            flash(f"Grupo não criado: {erro}.", "erro")
+            return
+        base = request.form.get("base_grupo", "")
+        if base == permissoes.GRUPO_ADMIN:
+            perms = permissoes.limpar(permissoes.TODAS)
+        else:
+            origem = next((g for g in grupos if g["nome"] == base), None)
+            perms = list(origem["permissoes"]) if origem else []
+        grupos.append({"nome": nome, "permissoes": perms})
+        config_store.salvar(cfg)
+        registrar("grupo_criado", nome + (f" (cópia de {base})" if base else ""))
+        flash(f"Grupo {nome} criado. Ajuste as permissões na tabela e salve.", "sucesso")
+
+    elif acao == "excluir_grupo":
+        nome = request.form.get("nome_grupo", "")
+        if any(u.get("grupo") == nome for u in cfg.get("usuarios", [])):
+            flash(f"O grupo {nome} tem usuários. Mova-os para outro grupo antes de excluir.", "erro")
+        elif not any(g["nome"] == nome for g in grupos):
+            flash("Grupo não encontrado.", "erro")
+        else:
+            cfg["grupos"] = [g for g in grupos if g["nome"] != nome]
+            config_store.salvar(cfg)
+            registrar("grupo_excluido", nome)
+            flash(f"Grupo {nome} excluído.", "sucesso")
+
+
 @app.route("/configuracoes", methods=["GET", "POST"])
 @login_obrigatorio
-@admin_obrigatorio
+@requer("usuarios", "rede")
 def configuracoes():
     cfg = config_store.carregar()
     usuario_logado = session.get("usuario")
     entrada_logada = _entrada_usuario_logado(cfg)
+    perms = permissoes.do_usuario(cfg, entrada_logada)
+    ip = _ip_do_cliente()
 
     if request.method == "POST":
         acao = request.form.get("acao")
+        exigida = "usuarios" if acao in _ACOES_USUARIOS else "rede" if acao in _ACOES_REDE else None
+        if exigida is None or exigida not in perms:
+            flash("Seu grupo não pode fazer essa alteração.", "erro")
+            return redirect(url_for("configuracoes"))
 
-        if acao == "novo_usuario":
-            senha_confirmacao = request.form.get("senha_atual_novo_usuario", "")
-            if not entrada_logada or not check_password_hash(entrada_logada["password_hash"], senha_confirmacao):
-                flash("Sua senha atual está incorreta — confirmação necessária pra criar um novo usuário.", "erro")
-            else:
-                novo_nome = request.form.get("novo_usuario_nome", "").strip()
-                nova_senha = request.form.get("novo_usuario_senha", "")
-                nova_confirmacao = request.form.get("novo_usuario_confirmacao", "")
-                problemas = validar_forca_senha(nova_senha)
-                if not novo_nome:
-                    problemas.append("informe um nome de usuário")
-                elif any(u["username"] == novo_nome for u in cfg.get("usuarios", [])):
-                    problemas.append("esse nome de usuário já existe")
-                if nova_senha != nova_confirmacao:
-                    problemas.append("as senhas não coincidem")
-                if problemas:
-                    flash("Não atende aos requisitos: " + ", ".join(problemas), "erro")
-                else:
-                    cfg.setdefault("usuarios", []).append({
-                        "username": novo_nome,
-                        "password_hash": generate_password_hash(nova_senha),
-                        "is_admin": False,
-                    })
-                    config_store.salvar(cfg)
-                    access_log.registrar(
-                        "usuario_criado", usuario=usuario_logado,
-                        ip=_ip_do_cliente(), detalhes=novo_nome,
-                    )
-                    flash(f"Usuário \"{novo_nome}\" criado com sucesso.", "sucesso")
-
-        elif acao == "remover_usuario":
-            alvo = request.form.get("usuario_remover", "")
-            entrada_alvo = next(
-                (u for u in cfg.get("usuarios", []) if u["username"] == alvo), None
-            )
-            if entrada_alvo and entrada_alvo.get("is_admin"):
-                flash("Não é possível remover o usuário administrador principal.", "erro")
-            elif len(cfg.get("usuarios", [])) <= 1:
-                flash("Não é possível remover o único usuário existente.", "erro")
-            elif alvo == usuario_logado:
-                flash("Você não pode remover seu próprio usuário enquanto estiver logado com ele.", "erro")
-            else:
-                antes = len(cfg.get("usuarios", []))
-                cfg["usuarios"] = [u for u in cfg.get("usuarios", []) if u["username"] != alvo]
-                if len(cfg["usuarios"]) < antes:
-                    config_store.salvar(cfg)
-                    access_log.registrar(
-                        "usuario_removido", usuario=usuario_logado,
-                        ip=_ip_do_cliente(), detalhes=alvo,
-                    )
-                    flash(f"Usuário \"{alvo}\" removido.", "sucesso")
+        if exigida == "usuarios":
+            _acao_usuarios(cfg, acao, usuario_logado, entrada_logada, ip)
 
         elif acao == "porta":
             try:
@@ -512,7 +680,7 @@ def configuracoes():
                 cfg["port"] = nova_porta
                 config_store.salvar(cfg)
                 access_log.registrar(
-                    "porta_alterada", usuario=usuario_logado, ip=_ip_do_cliente(),
+                    "porta_alterada", usuario=usuario_logado, ip=ip,
                     detalhes=f"{porta_atual} → {nova_porta}",
                 )
                 if _sob_gunicorn():
@@ -532,25 +700,44 @@ def configuracoes():
             bruto = request.form.get("allowed_ips", "")
             ips = [linha.strip() for linha in bruto.splitlines() if linha.strip()]
             invalidos = []
-            for ip in ips:
+            for faixa in ips:
                 try:
-                    ipaddress.ip_network(ip, strict=False)
+                    ipaddress.ip_network(faixa, strict=False)
                 except ValueError:
-                    invalidos.append(ip)
+                    invalidos.append(faixa)
             if invalidos:
                 flash("IPs/faixas inválidos: " + ", ".join(invalidos), "erro")
             else:
                 cfg["allowed_ips"] = ips
                 config_store.salvar(cfg)
+                access_log.registrar(
+                    "ips_alterados", usuario=usuario_logado, ip=ip,
+                    detalhes=", ".join(ips) or "sem restrição",
+                )
                 flash("Lista de IPs permitidos atualizada.", "sucesso")
 
-        secao = "acesso" if acao in ("porta", "acl") else "usuarios"
+        if acao in _ACOES_REDE:
+            secao = "acesso"
+        elif acao in ("salvar_grupos", "novo_grupo", "excluir_grupo"):
+            secao = "grupos"
+        else:
+            secao = "usuarios"
         return redirect(url_for("configuracoes", _anchor=secao))
 
+    usuarios = cfg.get("usuarios", [])
+    grupos = cfg.get("grupos", [])
+    contagem = {g: sum(1 for u in usuarios if u.get("grupo") == g)
+                for g in [permissoes.GRUPO_ADMIN] + [x["nome"] for x in grupos]}
     return render_template(
         "settings.html",
-        usuario_atual=session.get("usuario", ""),
-        usuarios=cfg.get("usuarios", []),
+        usuario_atual=usuario_logado,
+        usuarios=usuarios,
+        grupos=grupos,
+        contagem_grupos=contagem,
+        secoes=permissoes.SECOES,
+        so_admin=permissoes.SO_ADMIN,
+        grupo_admin=permissoes.GRUPO_ADMIN,
+        grupo_padrao=permissoes.GRUPO_PADRAO,
         porta_atual=cfg.get("port", config_store.DEFAULT_PORT),
         allowed_ips="\n".join(cfg.get("allowed_ips") or []),
     )

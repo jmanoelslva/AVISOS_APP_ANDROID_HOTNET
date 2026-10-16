@@ -405,19 +405,18 @@
 {% set logado = session.get('autenticado') %}
 <body class="{% if request.endpoint == 'login' %}pagina-login{% elif request.endpoint == 'minha_senha' %}pagina-estreita{% endif %}">
     <header>
-        <a class="marca" href="{{ url_for('dashboard') if logado else url_for('login') }}">
+        <a class="marca" href="{{ pagina_inicial if logado else url_for('login') }}">
             <span class="marca-selo"><img src="{{ url_for('static', filename='logo.png') }}" alt=""></span>
             <span><strong>Avisos HOTNET</strong><small>Painel</small></span>
         </a>
         {% if logado %}
         <nav class="abas" aria-label="Seções">
-            <a href="{{ url_for('dashboard') }}" class="{{ 'ativo' if request.endpoint == 'dashboard' }}" {% if request.endpoint == 'dashboard' %}aria-current="page"{% endif %}>Enviar</a>
-            <a href="{{ url_for('automaticos') }}" class="{{ 'ativo' if request.endpoint == 'automaticos' }}" {% if request.endpoint == 'automaticos' %}aria-current="page"{% endif %}>Automáticos</a>
-            <a href="{{ url_for('modelos') }}" class="{{ 'ativo' if request.endpoint == 'modelos' }}" {% if request.endpoint == 'modelos' %}aria-current="page"{% endif %}>Modelos</a>
-            <a href="{{ url_for('logs') }}" class="{{ 'ativo' if request.endpoint == 'logs' }}" {% if request.endpoint == 'logs' %}aria-current="page"{% endif %}>Histórico</a>
-            {% if usuario_e_admin %}
-            <a href="{{ url_for('configuracoes') }}" class="{{ 'ativo' if request.endpoint == 'configuracoes' }}" {% if request.endpoint == 'configuracoes' %}aria-current="page"{% endif %}>Ajustes</a>
-            {% endif %}
+            {# Só as abas que o grupo do usuário pode abrir (o servidor confere de novo). #}
+            {% if 'enviar' in pode %}<a href="{{ url_for('dashboard') }}" class="{{ 'ativo' if request.endpoint == 'dashboard' }}" {% if request.endpoint == 'dashboard' %}aria-current="page"{% endif %}>Enviar</a>{% endif %}
+            {% if 'ver_automaticos' in pode %}<a href="{{ url_for('automaticos') }}" class="{{ 'ativo' if request.endpoint == 'automaticos' }}" {% if request.endpoint == 'automaticos' %}aria-current="page"{% endif %}>Automáticos</a>{% endif %}
+            {% if 'modelos' in pode %}<a href="{{ url_for('modelos') }}" class="{{ 'ativo' if request.endpoint == 'modelos' }}" {% if request.endpoint == 'modelos' %}aria-current="page"{% endif %}>Modelos</a>{% endif %}
+            {% if 'historico' in pode or 'notificacoes' in pode %}<a href="{{ url_for('logs') }}" class="{{ 'ativo' if request.endpoint == 'logs' }}" {% if request.endpoint == 'logs' %}aria-current="page"{% endif %}>Histórico</a>{% endif %}
+            {% if 'usuarios' in pode or 'rede' in pode %}<a href="{{ url_for('configuracoes') }}" class="{{ 'ativo' if request.endpoint == 'configuracoes' }}" {% if request.endpoint == 'configuracoes' %}aria-current="page"{% endif %}>Ajustes</a>{% endif %}
         </nav>
         {% endif %}
         <div class="header-direita">

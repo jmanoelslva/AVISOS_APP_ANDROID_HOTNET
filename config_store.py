@@ -4,6 +4,8 @@ import secrets
 import uuid
 from pathlib import Path
 
+import permissoes
+
 CONFIG_PATH = Path(__file__).resolve().parent / "config.json"
 
 DEFAULT_PORT = 8765
@@ -91,6 +93,7 @@ def carregar() -> dict:
         _config_cache = _gerar_config_padrao()
         _config_cache["templates"] = _templates_padrao()
         _config_cache["templates_seed_aplicado"] = True
+        permissoes.migrar(_config_cache)
         salvar(_config_cache)
     else:
         with open(CONFIG_PATH, "r", encoding="utf-8") as f:
@@ -139,6 +142,9 @@ def carregar() -> dict:
         usuarios = _config_cache.get("usuarios", [])
         if usuarios and not any(u.get("is_admin") for u in usuarios):
             usuarios[0]["is_admin"] = True
+            alterou = True
+        # 1.5.0: grupos e permissões (admin → Administrador, demais → Atendimento).
+        if permissoes.migrar(_config_cache):
             alterou = True
         if alterou:
             salvar(_config_cache)
