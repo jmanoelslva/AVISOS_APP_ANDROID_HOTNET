@@ -1,68 +1,94 @@
 {% extends "base.html" %}
 {% import "_emojis.html" as em with context %}
 {% block titulo %}Modelos · Avisos HOTNET{% endblock %}
+{% block estilo %}
+        .cartoes { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 12px; }
+        .cartao { display: flex; flex-direction: column; gap: 6px; }
+        .cartao h2 { font-size: 14.5px; margin: 0; }
+        .cartao .titulo-notif { font-size: 12.5px; font-weight: 600; color: var(--cor-texto-secundario); }
+        .cartao p { margin: 0; font-size: 12.5px; color: var(--cor-texto-secundario); display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+        .cartao .pe { display: flex; align-items: center; gap: 6px; margin-top: auto; padding-top: 10px; }
+        .cartao .pe form { margin: 0 0 0 auto; }
+        .cartao-novo {
+            border: 1.5px dashed var(--cor-borda); border-radius: var(--raio); background: transparent;
+            color: var(--cor-acento-texto); font-weight: 700; min-height: 150px;
+        }
+        .cartao-novo:hover { border-color: var(--cor-acento); background: var(--cor-acento-bg); }
+        .editor { display: grid; grid-template-columns: minmax(0, 1fr) 260px; gap: 18px; align-items: start; margin-top: 14px; }
+        .editor > * { min-width: 0; }
+        @media (max-width: 700px) { .editor { grid-template-columns: minmax(0, 1fr); } }
+{% endblock %}
 {% block conteudo %}
-
 <div class="cabecalho-pagina">
-    <h1>Modelos</h1>
-    <p class="dica">Textos prontos para os avisos mais comuns. "Usar" abre o envio já preenchido; nada é enviado sem revisar.</p>
+    <div>
+        <h1>Modelos</h1>
+        <p class="dica">Textos prontos para os avisos mais comuns. "Usar" abre o envio preenchido; nada é enviado sem revisar.</p>
+    </div>
+    <button type="button" class="botao" id="botaoNovoModelo">+ Novo modelo</button>
 </div>
 
-<div class="card">
-    <div class="titulo-card"><span class="icone-card">✏️</span><h2 id="tituloFormModelo">Novo modelo</h2></div>
-    <form method="post" id="formModelo">
-        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-        <input type="hidden" name="acao" id="campoAcao" value="criar">
-        <input type="hidden" name="id" id="campoId" value="">
-
-        <label for="campoNome">Nome do modelo (só para você identificar)</label>
-        <input type="text" name="nome" id="campoNome" required maxlength="60" placeholder="Ex: Manutenção programada">
-
-        <label class="rotulo-linha" for="campoTituloModelo"><span>Título da notificação (opcional)</span><span class="contador" id="contTituloModelo">0/80</span></label>
-        <input type="text" name="titulo" id="campoTituloModelo" maxlength="80" placeholder="Aviso da HOTNET" data-recebe-emoji>
-
-        <label class="rotulo-linha" for="campoMensagemModelo"><span>Mensagem</span><span class="contador" id="contMensagemModelo">0/500</span></label>
-        {{ em.paleta() }}
-        <textarea name="mensagem" id="campoMensagemModelo" required maxlength="500" placeholder="Texto que vai no corpo da notificação" data-recebe-emoji></textarea>
-
-        <button type="submit" id="botaoSalvarModelo">Criar modelo</button>
-        <button type="button" id="botaoCancelarEdicao" class="botao-secundario" style="display:none;">Cancelar edição</button>
-    </form>
+<div class="cartoes">
+    {% for t in templates %}
+    <article class="card cartao">
+        <h2>{{ t.nome }}</h2>
+        {% if t.titulo and t.titulo != 'Aviso da HOTNET' %}<span class="titulo-notif">{{ t.titulo }}</span>{% endif %}
+        <p>{{ t.mensagem }}</p>
+        <div class="pe">
+            <a class="botao-secundario peq" href="{{ url_for('dashboard', modelo=t.id) }}">Usar</a>
+            <button type="button" class="botao-link editar-modelo-btn"
+                    data-id="{{ t.id }}" data-nome="{{ t.nome }}" data-titulo="{{ t.titulo }}" data-mensagem="{{ t.mensagem }}">Editar</button>
+            <form method="post" onsubmit="return confirm('Remover o modelo “{{ t.nome }}”?')">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <input type="hidden" name="acao" value="excluir">
+                <input type="hidden" name="id" value="{{ t.id }}">
+                <button type="submit" class="botao-link discreto">Remover</button>
+            </form>
+        </div>
+    </article>
+    {% endfor %}
+    <button type="button" class="cartao-novo" id="cartaoNovoModelo">+ Novo modelo</button>
 </div>
 
-<div class="card">
-    <div class="titulo-card"><span class="icone-card">🗂</span><h2>Modelos cadastrados</h2></div>
-    {% if templates %}
-        {% for t in templates %}
-        <div class="item-modelo">
+<dialog class="janela larga" id="janelaModelo" aria-labelledby="tituloFormModelo">
+    <h2 id="tituloFormModelo">Novo modelo</h2>
+    <p class="dica">O nome é só para você encontrar o modelo; o cliente vê o título e a mensagem.</p>
+    <form method="post" id="formModelo" class="editor">
+        <div class="pilha">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <input type="hidden" name="acao" id="campoAcao" value="criar">
+            <input type="hidden" name="id" id="campoId" value="">
             <div>
-                <strong>{{ t.nome }}</strong>
-                <p class="dica">{% if t.titulo and t.titulo != 'Aviso da HOTNET' %}<strong>{{ t.titulo }}</strong> · {% endif %}{{ t.mensagem }}</p>
+                <label class="rotulo" for="campoNome">Nome do modelo</label>
+                <input type="text" name="nome" id="campoNome" required maxlength="60" placeholder="Ex.: Manutenção programada">
             </div>
-            <div class="acoes-modelo">
-                <a class="botao-link" href="{{ url_for('dashboard', modelo=t.id) }}" style="text-decoration:none">Usar</a>
-                <button type="button" class="botao-secundario editar-modelo-btn"
-                        data-id="{{ t.id }}" data-nome="{{ t.nome }}"
-                        data-titulo="{{ t.titulo }}" data-mensagem="{{ t.mensagem }}">
-                    Editar
-                </button>
-                <form method="post" onsubmit="return confirm('Remover este modelo?')">
-                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                    <input type="hidden" name="acao" value="excluir">
-                    <input type="hidden" name="id" value="{{ t.id }}">
-                    <button type="submit" class="botao-remover">Remover</button>
-                </form>
+            <div>
+                <label class="rotulo rotulo-linha" for="campoTituloModelo"><span>Título da notificação (opcional)</span><span class="contador" id="contTituloModelo">0/80</span></label>
+                <input type="text" name="titulo" id="campoTituloModelo" maxlength="80" placeholder="Aviso da HOTNET" data-recebe-emoji>
+            </div>
+            <div>
+                <label class="rotulo rotulo-linha" for="campoMensagemModelo"><span>Mensagem</span><span class="contador" id="contMensagemModelo">0/500</span></label>
+                <div class="barra-campo">{{ em.botao() }}</div>
+                <textarea name="mensagem" id="campoMensagemModelo" required maxlength="500" placeholder="Texto que vai no corpo da notificação" data-recebe-emoji></textarea>
             </div>
         </div>
-        {% endfor %}
-    {% else %}
-        <p class="dica">Nenhum modelo cadastrado ainda.</p>
-    {% endif %}
-</div>
+        <div class="celular" aria-label="Prévia">
+            <span class="rotulo" style="color:#B9C0CA;margin:0">Ao abrir a notificação</span>
+            <div class="notificacao">
+                <span class="icone-app" aria-hidden="true"><img src="{{ url_for('static', filename='logo.png') }}" alt=""></span>
+                <div><strong id="previaTituloModelo">Aviso da HOTNET</strong><p id="previaTextoModelo">Sua mensagem aparece aqui.</p></div>
+            </div>
+        </div>
+    </form>
+    <div class="acoes-dialogo">
+        <button type="button" class="botao-secundario" id="botaoCancelarModelo">Cancelar</button>
+        <button type="submit" form="formModelo" id="botaoSalvarModelo">Criar modelo</button>
+    </div>
+</dialog>
 
 {{ em.script() }}
 <script>
     (function () {
+        var janela = document.getElementById('janelaModelo');
         var titulo = document.getElementById('campoTituloModelo');
         var mensagem = document.getElementById('campoMensagemModelo');
 
@@ -74,32 +100,33 @@
         function atualizar() {
             contar(titulo, document.getElementById('contTituloModelo'));
             contar(mensagem, document.getElementById('contMensagemModelo'));
+            document.getElementById('previaTituloModelo').textContent = titulo.value.trim() || 'Aviso da HOTNET';
+            document.getElementById('previaTextoModelo').textContent = mensagem.value.trim() || 'Sua mensagem aparece aqui.';
         }
         titulo.addEventListener('input', atualizar);
         mensagem.addEventListener('input', atualizar);
 
-        function preencher(acao, id, nome, t, m, cabecalho, botao, cancelar) {
+        function abrir(acao, id, nome, t, m) {
             document.getElementById('campoAcao').value = acao;
             document.getElementById('campoId').value = id;
             document.getElementById('campoNome').value = nome;
             titulo.value = t;
             mensagem.value = m;
-            document.getElementById('tituloFormModelo').innerText = cabecalho;
-            document.getElementById('botaoSalvarModelo').innerText = botao;
-            document.getElementById('botaoCancelarEdicao').style.display = cancelar ? 'inline-block' : 'none';
+            var editando = acao === 'editar';
+            document.getElementById('tituloFormModelo').textContent = editando ? 'Editar modelo' : 'Novo modelo';
+            document.getElementById('botaoSalvarModelo').textContent = editando ? 'Salvar alterações' : 'Criar modelo';
             atualizar();
+            if (typeof janela.showModal === 'function') janela.showModal(); else janela.setAttribute('open', '');
+            document.getElementById('campoNome').focus();
         }
 
+        ['botaoNovoModelo', 'cartaoNovoModelo'].forEach(function (id) {
+            document.getElementById(id).addEventListener('click', function () { abrir('criar', '', '', '', ''); });
+        });
         document.querySelectorAll('.editar-modelo-btn').forEach(function (b) {
-            b.addEventListener('click', function () {
-                preencher('editar', b.dataset.id, b.dataset.nome, b.dataset.titulo, b.dataset.mensagem, 'Editar modelo', 'Salvar alterações', true);
-                window.scrollTo({ top: 0, behavior: 'smooth' });
-            });
+            b.addEventListener('click', function () { abrir('editar', b.dataset.id, b.dataset.nome, b.dataset.titulo, b.dataset.mensagem); });
         });
-        document.getElementById('botaoCancelarEdicao').addEventListener('click', function () {
-            preencher('criar', '', '', '', '', 'Novo modelo', 'Criar modelo', false);
-        });
-        atualizar();
+        document.getElementById('botaoCancelarModelo').addEventListener('click', function () { janela.close(); });
     })();
 </script>
 {% endblock %}

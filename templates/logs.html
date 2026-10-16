@@ -1,49 +1,56 @@
 {% extends "base.html" %}
-{% block titulo %}Logs · Avisos HOTNET{% endblock %}
+{% block titulo %}Histórico · Avisos HOTNET{% endblock %}
+{% block estilo %}
+        .ferramentas { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-bottom: 12px; }
+        .ferramentas input[type=search] { width: 260px; max-width: 100%; padding: 8px 12px; }
+        .opcao-check { display: inline-flex; align-items: center; gap: 6px; margin-left: auto; font-size: 13px; color: var(--cor-texto-secundario); }
+        .opcao-check input { accent-color: var(--cor-acento); }
+        .tabela-logs { min-width: 680px; }
+        .tabela-logs td.evento { width: 160px; }
+        .tabela-logs td.quem { width: 110px; }
+        .tabela-logs td.ip { width: 140px; color: var(--cor-texto-secundario); font-size: 12px; overflow-wrap: anywhere; }
+        .tabela-logs td.detalhes { overflow-wrap: anywhere; }
+{% endblock %}
 {% block conteudo %}
-
 <div class="cabecalho-pagina">
-    <h1>Logs</h1>
-    <p class="dica">Logins, avisos enviados, alterações de usuários e os ciclos do poller, mais recentes primeiro (últimos 500 eventos).</p>
+    <div>
+        <h1>Histórico</h1>
+        <p class="dica">Avisos, acessos, alterações e ciclos automáticos, mais recentes primeiro (últimos 500 eventos).</p>
+    </div>
 </div>
 
 <div class="card">
     {% if eventos %}
-    <div class="filtros-logs" role="group" aria-label="Filtrar por tipo">
-        <button type="button" data-filtro="" aria-pressed="true">Tudo</button>
-        <button type="button" data-filtro="avisos" aria-pressed="false">Avisos</button>
-        <button type="button" data-filtro="acessos" aria-pressed="false">Acessos</button>
-        <button type="button" data-filtro="poller" aria-pressed="false">Poller</button>
-        <button type="button" data-filtro="falhas" aria-pressed="false">Falhas · {{ total_falhas }}</button>
+    <div class="ferramentas">
+        <div class="segmentado" role="group" aria-label="Filtrar por tipo">
+            <button type="button" data-filtro="" aria-pressed="true">Tudo</button>
+            <button type="button" data-filtro="avisos" aria-pressed="false">Avisos</button>
+            <button type="button" data-filtro="acessos" aria-pressed="false">Acessos</button>
+            <button type="button" data-filtro="poller" aria-pressed="false">Automáticos</button>
+            <button type="button" data-filtro="falhas" aria-pressed="false">Falhas · {{ total_falhas }}</button>
+        </div>
+        <input type="search" id="filtroLogs" placeholder="Buscar usuário, IP ou texto" aria-label="Buscar no histórico">
+        <label class="opcao-check"><input type="checkbox" id="mostrarCiclosVazios"> Ciclos sem notificação</label>
     </div>
-    <label for="filtroLogs">Buscar (usuário, evento, IP ou detalhes)</label>
-    <input type="text" id="filtroLogs" placeholder="Digite para filtrar a tabela abaixo…">
-    <label class="opcao-check"><input type="checkbox" id="mostrarCiclosVazios"> Mostrar ciclos do poller sem notificação</label>
-    <div class="tabela-logs-scroll" style="margin-top:12px">
-        <table class="tabela-logs">
+    <div class="rolavel">
+        <table class="tabela tabela-logs">
             <thead>
-                <tr>
-                    <th>Quando</th>
-                    <th>Evento</th>
-                    <th>Quem</th>
-                    <th>IP</th>
-                    <th>Detalhes</th>
-                </tr>
+                <tr><th>Quando</th><th>Evento</th><th>Quem</th><th>Detalhes</th><th>IP</th></tr>
             </thead>
             <tbody>
                 {% for e in eventos %}
                 <tr data-cat="{{ e.categorias }}" data-vazio="{{ '1' if e.ciclo_vazio else '0' }}">
-                    <td title="{{ e.quando }}">{{ e.relativo }}</td>
-                    <td><span class="etiqueta {{ e.classe }}">{{ e.rotulo }}</span></td>
-                    <td>{{ e.quem }}</td>
-                    <td>{{ e.ip }}</td>
-                    <td>{{ e.detalhes }}</td>
+                    <td class="quando" title="{{ e.quando }}">{{ e.relativo }}</td>
+                    <td class="evento"><span class="etiqueta {{ e.classe }}">{{ e.rotulo }}</span></td>
+                    <td class="quem">{{ e.quem }}</td>
+                    <td class="detalhes">{% if e.evento == 'aviso_enviado' %}<strong>{{ e.detalhes }}</strong>{% if e.mensagem %} · {{ e.mensagem }}{% endif %}{% else %}{{ e.detalhes }}{% endif %}</td>
+                    <td class="ip">{{ e.ip }}</td>
                 </tr>
                 {% endfor %}
             </tbody>
         </table>
     </div>
-    <p class="dica" id="filtroSemResultado" style="display:none;">Nenhum evento corresponde ao filtro.</p>
+    <p class="dica" id="filtroSemResultado" hidden>Nenhum evento corresponde ao filtro.</p>
     {% else %}
     <p class="dica">Nenhum evento registrado ainda.</p>
     {% endif %}
@@ -56,6 +63,7 @@
         var linhas = document.querySelectorAll('.tabela-logs tbody tr');
         var semResultado = document.getElementById('filtroSemResultado');
         var mostrarVazios = document.getElementById('mostrarCiclosVazios');
+        var botoes = document.querySelectorAll('[data-filtro]');
         var filtro = '';
 
         function aplicar() {
@@ -65,25 +73,25 @@
                 var cats = (linha.dataset.cat || '').split(' ');
                 var bate = (!filtro || cats.indexOf(filtro) >= 0) &&
                     (!termo || linha.textContent.toLowerCase().includes(termo)) &&
-                    // Ciclos que não notificaram ninguém ficam escondidos, salvo pedido (ou filtro Poller).
+                    // Ciclos que não notificaram ninguém ficam escondidos, salvo pedido (ou filtro Automáticos).
                     (linha.dataset.vazio !== '1' || mostrarVazios.checked || filtro === 'poller');
-                linha.style.display = bate ? '' : 'none';
+                linha.hidden = !bate;
                 if (bate) visiveis++;
             });
-            semResultado.style.display = visiveis === 0 ? 'block' : 'none';
+            semResultado.hidden = visiveis !== 0;
         }
 
-        document.querySelectorAll('.filtros-logs button').forEach(function (b) {
-            b.addEventListener('click', function () {
-                document.querySelectorAll('.filtros-logs button').forEach(function (x) { x.setAttribute('aria-pressed', 'false'); });
-                b.setAttribute('aria-pressed', 'true');
-                filtro = b.dataset.filtro;
-                aplicar();
-            });
-        });
+        function escolher(valor) {
+            filtro = valor;
+            botoes.forEach(function (x) { x.setAttribute('aria-pressed', x.dataset.filtro === valor ? 'true' : 'false'); });
+            aplicar();
+        }
+        botoes.forEach(function (b) { b.addEventListener('click', function () { escolher(b.dataset.filtro); }); });
         campo.addEventListener('input', aplicar);
         mostrarVazios.addEventListener('change', aplicar);
-        aplicar();
+        // Link "ver no histórico" das falhas (Automáticos) chega com #falhas.
+        var inicial = location.hash.replace('#', '');
+        escolher(['avisos', 'acessos', 'poller', 'falhas'].indexOf(inicial) >= 0 ? inicial : '');
     })();
 </script>
 {% endblock %}

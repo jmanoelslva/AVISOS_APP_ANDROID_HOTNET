@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+{% block titulo %}Mudando a porta · Avisos HOTNET{% endblock %}
+{% block conteudo %}
+<div class="card" style="max-width:520px;margin:40px auto 0">
+    <h2>Mudando o painel para a porta {{ nova_porta }}</h2>
+    <p class="dica">O serviço está reabrindo na porta nova; a antiga para de responder em instantes.
+        Você vai para o endereço novo sozinho em <strong id="segundos">6</strong> s.</p>
+    <p style="margin:16px 0 0"><a class="botao" id="novoEndereco" href="{{ novo_endereco }}">Ir agora para {{ novo_endereco.split('/configuracoes')[0] }}</a></p>
+    <p class="dica">Se a página não abrir, confira se o firewall do servidor libera a porta {{ nova_porta }}.
+        Pelo terminal do servidor dá para voltar: edite <code>port</code> em <code>/opt/aviso-broadcaster/config.json</code> e rode <code>systemctl restart aviso-broadcaster</code>.</p>
+</div>
+<script>
+    (function () {
+        var n = 6, el = document.getElementById('segundos');
+        var t = setInterval(function () {
+            n -= 1;
+            el.textContent = n;
+            if (n <= 0) { clearInterval(t); location.href = document.getElementById('novoEndereco').href; }
+        }, 1000);
+    })();
+</script>
+{% endblock %}

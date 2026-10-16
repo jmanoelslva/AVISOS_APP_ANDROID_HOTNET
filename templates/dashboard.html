@@ -1,114 +1,141 @@
 {% extends "base.html" %}
 {% import "_emojis.html" as em with context %}
 {% block titulo %}Enviar aviso · Avisos HOTNET{% endblock %}
+{% block estilo %}
+        /* Enviar (U2): modelos | texto | celular — tudo numa tela. */
+        .envio { display: grid; grid-template-columns: 230px minmax(0, 1fr) 320px; gap: 16px; align-items: stretch; }
+        /* Os três blocos com a mesma altura: o texto cresce para ocupar o card. */
+        .envio > .card { display: flex; flex-direction: column; }
+        #formAviso { flex: 1; grid-template-rows: auto 1fr auto; }
+        #formAviso > div:nth-of-type(2) { display: flex; flex-direction: column; }
+        #formAviso textarea { flex: 1; min-height: 160px; }
+        .col-modelos .dica { margin-top: auto; padding-top: 8px; }
+        .envio > * { min-width: 0; }
+        .lista-modelos { display: flex; flex-direction: column; gap: 2px; }
+        .lista-modelos button {
+            text-align: left; border: none; background: none; color: var(--cor-texto);
+            padding: 8px 10px; border-radius: 9px; font-weight: 600; font-size: 13.5px;
+        }
+        .lista-modelos button:hover { background: var(--cor-superficie-2); }
+        .lista-modelos button[aria-pressed="true"] { background: var(--cor-acento-bg); color: var(--cor-acento-texto); }
+        .lista-modelos small {
+            display: block; font-weight: 500; font-size: 11.5px; color: var(--cor-texto-secundario);
+            white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+        }
+        .previa { display: flex; }
+        .previa .celular { flex: 1; display: flex; flex-direction: column; }
+        .ultimos td.texto { width: 100%; max-width: 0; }
+        .ultimos td.texto span { display: block; color: var(--cor-texto-secundario); font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .ultimos td.acao { text-align: right; white-space: nowrap; }
+        @media (max-width: 1020px) {
+            .envio { grid-template-columns: minmax(0, 1fr) 300px; }
+            .col-modelos { grid-column: 1 / -1; }
+            .lista-modelos { flex-direction: row; flex-wrap: wrap; }
+            .lista-modelos small { display: none; }
+        }
+        @media (max-width: 760px) {
+            .envio { grid-template-columns: minmax(0, 1fr); }
+        }
+{% endblock %}
 {% block conteudo %}
 <div class="cabecalho-pagina">
-    <h1>Enviar aviso</h1>
-    <p class="dica">Chega como notificação para <strong>todos os clientes</strong> com o app instalado. Use para manutenção programada ou instabilidade na rede.</p>
+    <div>
+        <h1>Enviar aviso</h1>
+        <p class="dica">Chega como notificação para <strong>todos os clientes</strong> com o app instalado. Use para manutenção programada ou instabilidade na rede.</p>
+    </div>
 </div>
 
-<div class="grade-envio">
-    <div class="card">
+<div class="envio">
+    <div class="card col-modelos">
+        <div class="card-titulo"><h2>Começar de um modelo</h2><a class="link" href="{{ url_for('modelos') }}">Gerenciar</a></div>
         {% if templates %}
-        <label>Começar de um modelo</label>
-        <div class="cartoes-modelo" role="group" aria-label="Modelos">
+        <div class="lista-modelos" role="group" aria-label="Modelos">
             <button type="button" class="cartao-modelo" data-modelo="" data-titulo="" data-mensagem="" aria-pressed="{{ 'false' if modelo_inicial else 'true' }}">
-                <strong>✎ Em branco</strong><span>Escrever uma mensagem nova</span>
+                ✎ Em branco<small>Escrever do zero</small>
             </button>
             {% for t in templates %}
             <button type="button" class="cartao-modelo" data-modelo="{{ t.id }}" data-titulo="{{ t.titulo }}" data-mensagem="{{ t.mensagem }}" aria-pressed="{{ 'true' if t.id == modelo_inicial else 'false' }}">
-                <strong>{{ t.nome }}</strong><span>{{ t.mensagem }}</span>
+                {{ t.nome }}<small>{{ t.mensagem }}</small>
             </button>
             {% endfor %}
         </div>
-        <p class="dica">Escolher um modelo só preenche os campos; nada é enviado. <a href="{{ url_for('modelos') }}">Gerenciar modelos</a></p>
+        <p class="dica">Escolher só preenche os campos; nada é enviado.</p>
         {% else %}
-        <p class="dica">Nenhum modelo cadastrado ainda. <a href="{{ url_for('modelos') }}">Criar o primeiro modelo</a></p>
+        <p class="dica">Nenhum modelo ainda. <a href="{{ url_for('modelos') }}">Criar o primeiro</a></p>
         {% endif %}
+    </div>
 
-        <form method="post" id="formAviso">
+    <div class="card">
+        <form method="post" id="formAviso" class="pilha">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-            <label class="rotulo-linha" for="campoTitulo"><span>Título (opcional)</span><span class="contador" id="contTitulo">0/{{ limite_titulo }}</span></label>
-            <input type="text" id="campoTitulo" name="titulo" placeholder="Aviso da HOTNET" maxlength="{{ limite_titulo }}" data-recebe-emoji>
-
-            <label class="rotulo-linha" for="campoMensagem"><span>Mensagem</span><span class="contador" id="contMensagem">0/{{ limite_mensagem }}</span></label>
-            {{ em.paleta() }}
-            <textarea id="campoMensagem" name="mensagem" required maxlength="{{ limite_mensagem }}" data-recebe-emoji
-                placeholder="Ex: Manutenção programada hoje das 23h às 01h na região X. A conexão pode oscilar nesse período."></textarea>
-
-            <button type="submit" id="botaoEnviarAviso">Revisar e enviar</button>
+            <div>
+                <label class="rotulo rotulo-linha" for="campoTitulo"><span>Título (opcional)</span><span class="contador" id="contTitulo">0/{{ limite_titulo }}</span></label>
+                <input type="text" id="campoTitulo" name="titulo" placeholder="Aviso da HOTNET" maxlength="{{ limite_titulo }}" data-recebe-emoji>
+            </div>
+            <div>
+                <label class="rotulo rotulo-linha" for="campoMensagem"><span>Mensagem</span><span class="contador" id="contMensagem">0/{{ limite_mensagem }}</span></label>
+                <div class="barra-campo">
+                    {{ em.botao() }}
+                    <span class="dica">insere onde está o cursor</span>
+                </div>
+                <textarea id="campoMensagem" name="mensagem" required maxlength="{{ limite_mensagem }}" data-recebe-emoji
+                    placeholder="Ex.: Manutenção programada hoje das 23h às 01h na região X. A conexão pode oscilar nesse período."></textarea>
+            </div>
+            <div class="acoes">
+                <button type="submit" id="botaoEnviarAviso">Revisar e enviar</button>
+                <p class="dica"><kbd>Ctrl</kbd> + <kbd>Enter</kbd> abre a revisão · <span id="estadoRascunho">o rascunho fica salvo neste navegador</span></p>
+            </div>
         </form>
     </div>
 
     <div class="previa" aria-label="Prévia da notificação">
         <div class="celular">
-            <span class="rotulo-previa">Como vai aparecer</span>
-            <div class="notificacao">
-                <span class="icone-app" aria-hidden="true">HN</span>
-                <div><strong data-previa-titulo>Aviso da HOTNET</strong><p class="uma-linha" data-previa-texto></p></div>
+            <div class="segmentado" role="group" aria-label="Como ver a notificação">
+                <button type="button" aria-pressed="true" data-vista="recolhida">Recolhida</button>
+                <button type="button" aria-pressed="false" data-vista="aberta">Aberta</button>
+                <button type="button" aria-pressed="false" data-vista="sino">No sino</button>
             </div>
-            <span class="rotulo-previa">Ao abrir a notificação</span>
-            <div class="notificacao">
-                <span class="icone-app" aria-hidden="true">HN</span>
-                <div><strong data-previa-titulo>Aviso da HOTNET</strong><p data-previa-texto></p></div>
-            </div>
-            <span class="alerta-corte" id="alertaCorte" hidden>Recolhida, a notificação mostra só o começo; o resto aparece ao abrir.</span>
-            <span class="rotulo-previa">No sino do app</span>
-            <div class="notificacao sino">
-                <span class="icone-app" aria-hidden="true">📣</span>
-                <div><strong data-previa-titulo>Aviso da HOTNET</strong><p data-previa-texto></p></div>
+            <div class="tela-celular">
+                <div class="relogio" aria-hidden="true"><b id="relogioPrevia">--:--</b><span id="dataPrevia"></span></div>
+                <div class="notificacao recolhida" id="notifPrevia">
+                    <span class="icone-app" aria-hidden="true"><img src="{{ url_for('static', filename='logo.png') }}" alt=""></span>
+                    <div><strong data-previa-titulo>Aviso da HOTNET</strong><p data-previa-texto></p></div>
+                </div>
+                <p class="alerta-corte" id="alertaCorte" hidden>Recolhida, mostra só o começo. O resto aparece ao abrir.</p>
             </div>
         </div>
     </div>
 </div>
 
-<div class="grid-2col grade-envio" style="margin-top:22px">
-    <div class="card">
-        <div class="titulo-card"><span class="icone-card">🕘</span><h2>Últimos avisos enviados</h2></div>
-        {% if ultimos_avisos %}
-        <ul class="lista-historico">
+<div class="card" style="margin-top:16px">
+    <div class="card-titulo"><h2>Últimos avisos enviados</h2><a class="link" href="{{ url_for('logs') }}">Ver histórico</a></div>
+    {% if ultimos_avisos %}
+    <div class="rolavel">
+        <table class="tabela ultimos"><tbody>
             {% for a in ultimos_avisos %}
-            <li>
-                <span class="quando" title="{{ a.quando }}">{{ a.relativo }}</span>
-                <span class="texto"><strong>{{ a.detalhes }}</strong>{% if a.usuario %} · {{ a.usuario }}{% endif %}{% if a.mensagem %}<span>{{ a.mensagem }}</span>{% endif %}</span>
-                {% if a.mensagem %}
-                <button type="button" class="botao-link usar-de-novo" data-titulo="{{ a.detalhes }}" data-mensagem="{{ a.mensagem }}">Usar de novo</button>
-                {% endif %}
-            </li>
+            <tr>
+                <td class="quando" title="{{ a.quando }}">{{ a.relativo }}</td>
+                <td class="texto"><strong>{{ a.detalhes }}</strong>{% if a.usuario %} · {{ a.usuario }}{% endif %}{% if a.mensagem %}<span>{{ a.mensagem }}</span>{% endif %}</td>
+                <td class="acao">{% if a.mensagem %}<button type="button" class="botao-link usar-de-novo" data-titulo="{{ a.detalhes }}" data-mensagem="{{ a.mensagem }}">Usar de novo</button>{% endif %}</td>
+            </tr>
             {% endfor %}
-        </ul>
-        {% else %}
-        <p class="dica">Nenhum aviso enviado ainda.</p>
-        {% endif %}
+        </tbody></table>
     </div>
-
-    {% if poller %}
-    <div class="card">
-        <div class="titulo-card"><span class="icone-card">🤖</span><h2>Notificações automáticas</h2></div>
-        <p class="dica" style="margin:0">Pagamento confirmado, chamado respondido, atraso e boleto que vence amanhã.</p>
-        <div class="status-poller">
-            <div><small>Último ciclo</small><strong class="{{ 'ruim' if poller.parado else 'ok' }}">● {{ poller.ultimo_hora }}</strong><p class="dica">{{ poller.ultimo_relativo }}</p></div>
-            <div><small>Próximo</small><strong>{{ poller.proximo_hora }}</strong><p class="dica">{{ poller.intervalo }}</p></div>
-            <div><small>Falhas 24h</small><strong class="{{ 'ruim' if poller.falhas_24h else 'ok' }}">{{ poller.falhas_24h }}</strong><p class="dica">{{ 'ver em Logs' if poller.falhas_24h else 'nenhuma' }}</p></div>
-        </div>
-        {% if poller.parado %}
-        <p class="dica ruim" style="margin-top:10px"><strong>O poller pode estar parado:</strong> confira <code>systemctl list-timers controllr-poller.timer</code>.</p>
-        {% endif %}
-        {% if poller.resumo %}<p class="dica" style="margin-top:10px">Último ciclo: {{ poller.resumo }}</p>{% endif %}
-    </div>
+    {% else %}
+    <p class="dica">Nenhum aviso enviado ainda.</p>
     {% endif %}
 </div>
 
-<dialog class="confirmacao" id="dialogoEnvio" aria-labelledby="tituloDialogo">
+<dialog class="janela" id="dialogoEnvio" aria-labelledby="tituloDialogo">
     <h2 id="tituloDialogo">Enviar para todos os clientes?</h2>
     <p class="dica">Chega agora em todos os celulares com o app instalado. Não dá para desfazer.</p>
-    <div class="notificacao">
-        <span class="icone-app" aria-hidden="true">HN</span>
+    <div class="notificacao" style="margin-top:14px">
+        <span class="icone-app" aria-hidden="true"><img src="{{ url_for('static', filename='logo.png') }}" alt=""></span>
         <div><strong data-previa-titulo>Aviso da HOTNET</strong><p data-previa-texto></p></div>
     </div>
     <div class="acoes-dialogo">
         <button type="button" class="botao-secundario" id="botaoVoltar">Voltar e editar</button>
-        <button type="button" id="botaoConfirmar">Enviar agora</button>
+        <button type="button" class="botao" id="botaoConfirmar">Enviar agora</button>
     </div>
 </dialog>
 
@@ -119,7 +146,9 @@
         var titulo = document.getElementById('campoTitulo');
         var mensagem = document.getElementById('campoMensagem');
         var dialogo = document.getElementById('dialogoEnvio');
+        var notif = document.getElementById('notifPrevia');
         var VAZIO = 'Sua mensagem aparece aqui.';
+        var CHAVE_RASCUNHO = 'aviso-broadcaster-rascunho';
 
         function contar(campo, rotulo) {
             var max = parseInt(campo.getAttribute('maxlength'), 10);
@@ -133,41 +162,96 @@
             // textContent: o texto digitado nunca vira HTML.
             document.querySelectorAll('[data-previa-titulo]').forEach(function (el) { el.textContent = t; });
             document.querySelectorAll('[data-previa-texto]').forEach(function (el) { el.textContent = m; });
-            document.getElementById('alertaCorte').hidden = mensagem.value.trim().length <= 60;
+            document.getElementById('alertaCorte').hidden = !(notif.classList.contains('recolhida') && mensagem.value.trim().length > 60);
             contar(titulo, document.getElementById('contTitulo'));
             contar(mensagem, document.getElementById('contMensagem'));
+        }
+
+        // Rascunho (U10): guardado só neste navegador; some ao enviar.
+        function salvarRascunho() {
+            try {
+                if (titulo.value || mensagem.value) localStorage.setItem(CHAVE_RASCUNHO, JSON.stringify({ t: titulo.value, m: mensagem.value }));
+                else localStorage.removeItem(CHAVE_RASCUNHO);
+            } catch (e) {}
+        }
+        function lerRascunho() {
+            try { return JSON.parse(localStorage.getItem(CHAVE_RASCUNHO) || 'null'); } catch (e) { return null; }
         }
 
         function preencher(t, m) {
             titulo.value = t || '';
             mensagem.value = m || '';
             atualizar();
+            salvarRascunho();
+        }
+
+        function marcarModelo(botao) {
+            document.querySelectorAll('.cartao-modelo').forEach(function (c) { c.setAttribute('aria-pressed', c === botao ? 'true' : 'false'); });
         }
 
         document.querySelectorAll('.cartao-modelo').forEach(function (cartao) {
             cartao.addEventListener('click', function () {
-                document.querySelectorAll('.cartao-modelo').forEach(function (c) { c.setAttribute('aria-pressed', 'false'); });
-                cartao.setAttribute('aria-pressed', 'true');
+                marcarModelo(cartao);
                 preencher(cartao.dataset.titulo, cartao.dataset.mensagem);
             });
         });
+
+        // Só depois do envio confirmado pelo servidor (flash de sucesso): se falhar, o texto continua salvo.
+        if (document.querySelector('.flash-sucesso')) { try { localStorage.removeItem(CHAVE_RASCUNHO); } catch (e) {} }
         var inicial = document.querySelector('.cartao-modelo[aria-pressed="true"]:not([data-modelo=""])');
-        if (inicial) preencher(inicial.dataset.titulo, inicial.dataset.mensagem);
+        var rascunho = lerRascunho();
+        if (inicial) {
+            preencher(inicial.dataset.titulo, inicial.dataset.mensagem);
+        } else if (rascunho && (rascunho.t || rascunho.m)) {
+            titulo.value = rascunho.t || '';
+            mensagem.value = rascunho.m || '';
+            marcarModelo(null);
+            document.getElementById('estadoRascunho').textContent = 'rascunho recuperado deste navegador';
+        }
 
         document.querySelectorAll('.usar-de-novo').forEach(function (botao) {
             botao.addEventListener('click', function () {
-                document.querySelectorAll('.cartao-modelo').forEach(function (c) { c.setAttribute('aria-pressed', 'false'); });
+                marcarModelo(null);
                 preencher(botao.dataset.titulo, botao.dataset.mensagem);
                 window.scrollTo({ top: 0, behavior: 'smooth' });
                 mensagem.focus();
             });
         });
 
-        titulo.addEventListener('input', atualizar);
-        mensagem.addEventListener('input', atualizar);
+        // Prévia com abas (U3): uma notificação por vez.
+        document.querySelectorAll('.celular [data-vista]').forEach(function (b) {
+            b.addEventListener('click', function () {
+                document.querySelectorAll('.celular [data-vista]').forEach(function (x) { x.setAttribute('aria-pressed', x === b ? 'true' : 'false'); });
+                notif.classList.toggle('recolhida', b.dataset.vista === 'recolhida');
+                notif.classList.toggle('sino', b.dataset.vista === 'sino');
+                notif.querySelector('.icone-app').innerHTML = b.dataset.vista === 'sino'
+                    ? '📣' : '<img src="{{ url_for('static', filename='logo.png') }}" alt="">';
+                atualizar();
+            });
+        });
+
+        // Relógio da tela de bloqueio da prévia.
+        function relogio() {
+            var d = new Date();
+            document.getElementById('relogioPrevia').textContent = String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
+            document.getElementById('dataPrevia').textContent = d.toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long' });
+        }
+        relogio();
+        setInterval(relogio, 30000);
+
+        titulo.addEventListener('input', function () { atualizar(); salvarRascunho(); });
+        mensagem.addEventListener('input', function () { atualizar(); salvarRascunho(); });
         atualizar();
 
-        // Confirmação no próprio painel, com a notificação exata (antes era o confirm() do navegador).
+        // Ctrl/Cmd + Enter abre a revisão (U11).
+        form.addEventListener('keydown', function (ev) {
+            if (ev.key === 'Enter' && (ev.ctrlKey || ev.metaKey)) {
+                ev.preventDefault();
+                if (form.requestSubmit) form.requestSubmit(); else form.dispatchEvent(new Event('submit', { cancelable: true }));
+            }
+        });
+
+        // Confirmação no próprio painel, com a notificação exata.
         form.addEventListener('submit', function (ev) {
             ev.preventDefault();
             if (!mensagem.value.trim()) { mensagem.reportValidity(); return; }
@@ -177,6 +261,7 @@
             }
             atualizar();
             dialogo.showModal();
+            document.getElementById('botaoVoltar').focus();
         });
         document.getElementById('botaoVoltar').addEventListener('click', function () { dialogo.close(); });
         document.getElementById('botaoConfirmar').addEventListener('click', enviar);

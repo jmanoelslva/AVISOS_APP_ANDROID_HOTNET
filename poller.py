@@ -1,10 +1,11 @@
 """Ponto de entrada do poller (pagamento confirmado + reforço de atraso +
-boleto vence amanhã + chamado atualizado) — roda uma vez e sai (chamado
+lembretes de vencimento + chamado atualizado) — roda uma vez e sai (chamado
 por systemd timer, ver controllr-poller.timer). Sem loop/scheduler
 interno de propósito: mantém o processo simples e sem estado entre
 execuções além do que já está em poller_state.json.
 
-"Boleto vence amanhã" substitui o antigo lembrete local do app
+Lembretes de vencimento (antecedência e horário configuráveis no painel,
+ver lembretes.py) substituem o antigo lembrete local do app
 (VencimentoWorker, removido) — mais confiável, não depende do WorkManager
 acordar sozinho no aparelho.
 """
@@ -15,6 +16,7 @@ import sys
 
 import access_log
 import controllr_config
+import lembretes
 import state_store
 from controllr_client import ControllrClient
 from fcm_sender import enviar_para_conta
@@ -87,13 +89,20 @@ def processar_pagamentos(faturas: list[dict], estado: dict, primeira_vez: bool) 
     return notificadas
 
 
-def processar_atrasos(faturas: list[dict], estado: dict, primeira_vez: bool) -> int:
+def processar_atrasos(faturas: list[dict], estado: dict, primeira_vez: bool, no_horario: bool = True, ativo: bool = True) -> int:
     """Reforço de atraso — um empurrão único quando a fatura vira atrasada
     (`invoice_late`), não um lembrete repetido enquanto ela continuar assim.
     Reaproveita a mesma lista de `buscar_faturas()` do pagamento confirmado
     (mesma janela de 90 dias já cobre faturas vencidas), sem chamada extra.
     """
     atrasadas_vistas = estado.setdefault("faturas_atrasadas", {})
+    if not ativo:
+        # Desativado no painel: marca como visto sem avisar. Ao reativar, só os
+        # atrasos novos geram aviso (sem rajada dos que atrasaram enquanto estava desligado).
+        for fatura in faturas:
+            if fatura.get("invoice_late"):
+                atrasadas_vistas.setdefault(str(fatura.get("invoice_pk")), True)
+        return 0
     notificadas = 0
     for fatura in faturas:
         pk = str(fatura.get("invoice_pk"))
@@ -106,6 +115,9 @@ def processar_atrasos(faturas: list[dict], estado: dict, primeira_vez: bool) -> 
             and not primeira_vez
             and _fatura_vale_notificar(fatura)
         ):
+            if not no_horario:
+                # Fora do horário de lembretes: fica para o primeiro ciclo dentro dele.
+                continue
             cpf = fatura.get("client_doc1") or ""
             if cpf:
                 try:
@@ -131,49 +143,73 @@ def processar_atrasos(faturas: list[dict], estado: dict, primeira_vez: bool) -> 
     return notificadas
 
 
-def processar_vence_amanha(faturas: list[dict], estado: dict, primeira_vez: bool) -> int:
-    """Substitui o antigo lembrete local (VencimentoWorker, WorkManager no
-    aparelho) — rodava só 1x/dia e dependia do Android acordar o job sozinho
-    (Doze/otimização de bateria). Aqui, mesma lista de buscar_faturas() dos
-    outros dois eventos de fatura, empurrão único por invoice_pk.
+def processar_vencimentos(faturas: list[dict], estado: dict, primeira_vez: bool, cfg: dict, no_horario: bool) -> int:
+    """Lembrete de vencimento com a antecedência configurada no painel
+    (`lembretes.dias_antes`, 1 a 7, padrão a véspera; 0 desativa). Substitui o antigo lembrete
+    local do app (VencimentoWorker, removido). Um empurrão por boleto.
+
+    - Véspera (1 dia): tipo "boleto_vence_amanha", o mesmo de sempre; estado em
+      "faturas_vence_amanha" (com baseline na primeira vez, como antes).
+    - 2 a 7 dias: tipo "boleto_vence_em" (com "dias" e "invoice_date_due"), que só o
+      app 2.5.3+ mostra; versões anteriores ignoram tipos desconhecidos
+      (rotearMensagem → Ignorar). Estado em "faturas_vence_em" ("pk:dias"; trocar a
+      antecedência não repete o aviso de quem já recebeu com a mesma). Sem
+      baseline de propósito: só recebe quem vence exatamente naquela data, que é
+      justamente o público do lembrete.
+    - Fora do horário nada é marcado como visto: sai no primeiro ciclo dentro dele.
     """
     hoje = datetime.date.today()
-    amanha_iso = (hoje + datetime.timedelta(days=1)).isoformat()
-
-    vistas = estado.setdefault("faturas_vence_amanha", {})
+    vistas_amanha = estado.setdefault("faturas_vence_amanha", {})
+    vistas_em = estado.setdefault("faturas_vence_em", {})
     notificadas = 0
     for fatura in faturas:
+        try:
+            vencimento = datetime.date.fromisoformat((fatura.get("invoice_date_due") or "")[:10])
+        except ValueError:
+            continue
+        dias = (vencimento - hoje).days
+        if dias < 1 or fatura.get("invoice_date_credit"):
+            continue
         pk = str(fatura.get("invoice_pk"))
-        ja_notificada = vistas.get(pk, False)
-        vence_amanha = (fatura.get("invoice_date_due") or "").startswith(amanha_iso)
 
-        if (
-            vence_amanha
-            and not fatura.get("invoice_date_credit")
-            and not ja_notificada
-            and not primeira_vez
-            and _fatura_vale_notificar(fatura)
-        ):
-            cpf = fatura.get("client_doc1") or ""
-            if cpf:
-                try:
-                    enviar_para_conta(
-                        topico_conta_cpf(cpf),
-                        "boleto_vence_amanha",
-                        {
-                            "invoice_pk": pk,
-                            "contract_number": fatura.get("contract_number") or "",
-                            "invoice_amount_document": fatura.get("invoice_amount_document") or "",
-                            "pix_code": fatura.get("invoice_qrcode") or "",
-                        },
-                    )
-                    notificadas += 1
-                    vistas[pk] = True
-                except Exception as e:
-                    access_log.registrar("poller_falha", detalhes=f"envio vence-amanhã fatura {pk}: {e}")
-        elif vence_amanha:
-            vistas.setdefault(pk, True)
+        if dias == 1:
+            vistas, chave, tipo = vistas_amanha, pk, "boleto_vence_amanha"
+            # Baseline da véspera vale mesmo que a véspera esteja desligada.
+            if primeira_vez:
+                vistas.setdefault(chave, True)
+                continue
+        else:
+            vistas, chave, tipo = vistas_em, f"{pk}:{dias}", "boleto_vence_em"
 
+        if dias != cfg["dias_antes"] or vistas.get(chave) or not no_horario:
+            continue
+        if not _fatura_vale_notificar(fatura):
+            vistas[chave] = True
+            continue
+        cpf = fatura.get("client_doc1") or ""
+        if not cpf:
+            continue
+        dados = {
+            "invoice_pk": pk,
+            "contract_number": fatura.get("contract_number") or "",
+            "invoice_amount_document": fatura.get("invoice_amount_document") or "",
+            "pix_code": fatura.get("invoice_qrcode") or "",
+        }
+        if tipo == "boleto_vence_em":
+            dados["dias"] = str(dias)
+            dados["invoice_date_due"] = vencimento.isoformat()
+        try:
+            enviar_para_conta(topico_conta_cpf(cpf), tipo, dados)
+            notificadas += 1
+            vistas[chave] = True
+        except Exception as e:
+            access_log.registrar("poller_falha", detalhes=f"envio lembrete {dias}d fatura {pk}: {e}")
+
+    # Limpa lembretes de boletos que já venceram (o estado não cresce para sempre).
+    hoje_iso = hoje.isoformat()
+    vencidas = {str(f.get("invoice_pk")) for f in faturas if (f.get("invoice_date_due") or "")[:10] < hoje_iso}
+    for chave in [c for c in vistas_em if c.split(":")[0] in vencidas]:
+        del vistas_em[chave]
     return notificadas
 
 
@@ -247,9 +283,11 @@ def main() -> int:
         print(f"Falha ao consultar faturas: {e}", file=sys.stderr)
         return 1
 
+    cfg_lembretes = lembretes.ler()
+    no_horario = lembretes.dentro_do_horario(cfg_lembretes)
     notif_pagamentos = processar_pagamentos(faturas, estado, primeira_vez_pagamentos)
-    notif_atrasos = processar_atrasos(faturas, estado, primeira_vez_atrasos)
-    notif_vence_amanha = processar_vence_amanha(faturas, estado, primeira_vez_vence_amanha)
+    notif_atrasos = processar_atrasos(faturas, estado, primeira_vez_atrasos, no_horario, cfg_lembretes["atraso_ativo"])
+    notif_vencimentos = processar_vencimentos(faturas, estado, primeira_vez_vence_amanha, cfg_lembretes, no_horario)
 
     try:
         total_chamados, notif_chamados = processar_chamados(cliente, estado, primeira_vez_chamados)
@@ -270,12 +308,14 @@ def main() -> int:
     )
     partes.append(
         "baseline vence-amanhã gravada" if primeira_vez_vence_amanha
-        else f"{notif_vence_amanha} vence-amanhã notificados"
+        else f"{notif_vencimentos} lembretes de vencimento notificados"
     )
     partes.append(
         f"{total_chamados} chamados, baseline gravada" if primeira_vez_chamados
         else f"{total_chamados} chamados ({notif_chamados} notificados)"
     )
+    if not no_horario:
+        partes.append(f"lembretes e atrasos aguardando o horário ({cfg_lembretes['inicio']} às {cfg_lembretes['fim']})")
     access_log.registrar("poller_ciclo", detalhes=", ".join(partes))
     return 0
 

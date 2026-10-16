@@ -1,5 +1,8 @@
 import ipaddress
 import os
+import signal
+import socket
+import threading
 import time
 import uuid
 from functools import wraps
@@ -11,6 +14,7 @@ from werkzeug.security import check_password_hash, generate_password_hash
 
 import access_log
 import config_store
+import lembretes
 import painel_info
 from fcm_sender import enviar_aviso
 from security import validar_forca_senha
@@ -115,7 +119,52 @@ def admin_obrigatorio(f):
 def injetar_usuario_e_admin():
     cfg = config_store.carregar()
     entrada = _entrada_usuario_logado(cfg)
-    return {"usuario_e_admin": bool(entrada and entrada.get("is_admin")), "emojis": painel_info.EMOJIS}
+    # Selo "Automáticos ok · 18:01" no topo de todas as páginas (U9).
+    status = None
+    if session.get("autenticado"):
+        status = painel_info.status_topo(access_log.listar(limite=access_log.MAX_LINHAS))
+    return {
+        "usuario_e_admin": bool(entrada and entrada.get("is_admin")),
+        "emojis": painel_info.EMOJIS,
+        "status_topo": status,
+    }
+
+# Troca de porta pelo painel (reinício automático): abaixo de 1024 exige root.
+PORTA_MIN = 1024
+
+
+def _porta_livre(porta: int) -> bool:
+    """Testa se dá pra escutar na porta (mesmo bind dual-stack do gunicorn.conf.py)."""
+    try:
+        with socket.socket(socket.AF_INET6, socket.SOCK_STREAM) as s:
+            s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+            s.bind(("::", porta))
+        return True
+    except OSError:
+        return False
+
+
+def _sob_gunicorn() -> bool:
+    return os.environ.get("SERVER_SOFTWARE", "").startswith("gunicorn")
+
+
+def _recarregar_servico_em_instantes() -> None:
+    """SIGHUP no master do Gunicorn: relê gunicorn.conf.py (porta nova), abre a
+    escuta nova e troca o worker, sem root e sem systemctl. Espera um pouco pra
+    resposta (a página "reiniciando") chegar antes."""
+    master = os.getppid()
+    threading.Timer(1.5, lambda: os.kill(master, signal.SIGHUP)).start()
+
+
+def _endereco_com_porta(porta: int) -> str:
+    host = request.host
+    # Tira a porta atual do host (IPv6 entre colchetes ou nome/IPv4).
+    if host.startswith("["):
+        host = host[: host.index("]") + 1]
+    else:
+        host = host.rsplit(":", 1)[0]
+    return f"{request.scheme}://{host}:{porta}/configuracoes#acesso"
+
 
 # Limites do push (iguais aos maxlength dos formulários; o servidor também confere).
 LIMITE_TITULO = 80
@@ -237,7 +286,6 @@ def dashboard():
         templates=cfg.get("templates", []),
         modelo_inicial=modelo_inicial,
         ultimos_avisos=painel_info.ultimos_avisos(eventos),
-        poller=painel_info.status_poller(eventos),
         limite_titulo=LIMITE_TITULO,
         limite_mensagem=LIMITE_MENSAGEM,
     )
@@ -300,6 +348,48 @@ def modelos():
         return redirect(url_for("modelos"))
 
     return render_template("modelos.html", templates=cfg.get("templates", []))
+
+
+@app.route("/automaticos", methods=["GET", "POST"])
+@login_obrigatorio
+def automaticos():
+    """Notificações que o poller manda sozinho: funcionamento, contagem do dia e
+    lembretes (antecedência e horário). Todos veem; só o admin altera."""
+    cfg = config_store.carregar()
+    entrada = _entrada_usuario_logado(cfg)
+    e_admin = bool(entrada and entrada.get("is_admin"))
+
+    if request.method == "POST":
+        if not e_admin:
+            flash("Apenas o administrador pode alterar os lembretes.", "erro")
+            return redirect(url_for("automaticos"))
+        novo, erro = lembretes.validar_formulario(
+            request.form.get("dias_antes"),
+            request.form.get("inicio", ""),
+            request.form.get("fim", ""),
+            request.form.get("atraso_ativo", ""),
+        )
+        if erro:
+            flash("Lembretes não salvos: " + erro + ".", "erro")
+        else:
+            cfg["lembretes"] = novo
+            config_store.salvar(cfg)
+            access_log.registrar(
+                "lembretes_alterados", usuario=session.get("usuario", ""),
+                ip=_ip_do_cliente(), detalhes=lembretes.descrever(novo),
+            )
+            flash("Lembretes salvos: " + lembretes.descrever(novo) + ". Valem a partir do próximo ciclo, sem reiniciar nada.", "sucesso")
+        return redirect(url_for("automaticos"))
+
+    eventos = access_log.listar(limite=access_log.MAX_LINHAS)
+    return render_template(
+        "automaticos.html",
+        poller=painel_info.status_poller(eventos),
+        contagens=painel_info.contagens_hoje(eventos),
+        lembretes=lembretes.normalizar(cfg.get("lembretes")),
+        dias_permitidos=lembretes.DIAS_PERMITIDOS,
+        desativado=lembretes.DESATIVADO,
+    )
 
 
 @app.route("/logs")
@@ -405,17 +495,35 @@ def configuracoes():
         elif acao == "porta":
             try:
                 nova_porta = int(request.form.get("porta", ""))
-                if not (1 <= nova_porta <= 65535):
-                    raise ValueError
+            except ValueError:
+                nova_porta = 0
+            porta_atual = cfg.get("port", config_store.DEFAULT_PORT)
+            if not (PORTA_MIN <= nova_porta <= 65535):
+                # Abaixo de 1024 o serviço (sem root) não consegue escutar e ficaria fora do ar.
+                flash(f"Porta inválida: use um número entre {PORTA_MIN} e 65535.", "erro")
+            elif nova_porta == porta_atual:
+                flash(f"O painel já está na porta {nova_porta}.", "sucesso")
+            elif not _porta_livre(nova_porta):
+                flash(f"A porta {nova_porta} já está em uso por outro programa neste servidor. Escolha outra.", "erro")
+            else:
                 cfg["port"] = nova_porta
                 config_store.salvar(cfg)
+                access_log.registrar(
+                    "porta_alterada", usuario=usuario_logado, ip=_ip_do_cliente(),
+                    detalhes=f"{porta_atual} → {nova_porta}",
+                )
+                if _sob_gunicorn():
+                    _recarregar_servico_em_instantes()
+                    return render_template(
+                        "reiniciando.html",
+                        nova_porta=nova_porta,
+                        novo_endereco=_endereco_com_porta(nova_porta),
+                    )
                 flash(
-                    f"Porta salva como {nova_porta}. Reinicie o serviço pra aplicar: "
-                    f"systemctl restart aviso-broadcaster",
+                    f"Porta salva como {nova_porta}. Este painel não roda pelo serviço, então "
+                    f"reinicie-o à mão para aplicar.",
                     "sucesso",
                 )
-            except ValueError:
-                flash("Porta inválida — use um número entre 1 e 65535.", "erro")
 
         elif acao == "acl":
             bruto = request.form.get("allowed_ips", "")
@@ -433,7 +541,8 @@ def configuracoes():
                 config_store.salvar(cfg)
                 flash("Lista de IPs permitidos atualizada.", "sucesso")
 
-        return redirect(url_for("configuracoes"))
+        secao = "acesso" if acao in ("porta", "acl") else "usuarios"
+        return redirect(url_for("configuracoes", _anchor=secao))
 
     return render_template(
         "settings.html",

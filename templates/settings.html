@@ -1,95 +1,143 @@
 {% extends "base.html" %}
-{% block titulo %}Configurações{% endblock %}
+{% block titulo %}Ajustes · Avisos HOTNET{% endblock %}
+{% block estilo %}
+        /* Dois blocos da mesma altura lado a lado (sem sobra de espaço). */
+        .ajustes { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; align-items: stretch; }
+        .ajustes > .card { display: flex; flex-direction: column; }
+        .usuarios td { padding: 10px 6px; border-top: 1px solid var(--cor-borda); vertical-align: middle; }
+        .usuarios tr:first-child td { border-top: none; }
+        .usuarios .nome { display: flex; align-items: center; gap: 10px; font-weight: 600; }
+        .usuarios .acao { text-align: right; }
+        .usuarios form { margin: 0; }
+        .ajuste { display: grid; grid-template-columns: 150px minmax(0, 1fr); gap: 14px; padding: 14px 0; border-top: 1px solid var(--cor-borda); align-items: start; }
+        .ajuste:first-of-type { border-top: none; padding-top: 0; }
+        .ajuste > div:first-child b { display: block; font-size: 13.5px; }
+        .ajuste > div:first-child small { color: var(--cor-texto-secundario); font-size: 12px; }
+        .ajuste form { display: grid; gap: 8px; }
+        .linha-porta { display: flex; gap: 8px; align-items: center; }
+        .linha-porta input { width: 120px; }
+        .rodape-card { margin-top: auto; padding-top: 12px; }
+        @media (max-width: 860px) { .ajustes { grid-template-columns: minmax(0, 1fr); } }
+        @media (max-width: 520px) { .ajuste { grid-template-columns: minmax(0, 1fr); gap: 6px; } }
+{% endblock %}
 {% block conteudo %}
-
 <div class="cabecalho-pagina">
-    <h1>Configurações</h1>
-    <p class="dica">Gerencie quem tem acesso ao painel, a porta do serviço e quais IPs podem entrar.</p>
+    <div>
+        <h1>Ajustes</h1>
+        <p class="dica">Quem entra no painel e de onde. Os lembretes automáticos ficam na aba <a href="{{ url_for('automaticos') }}">Automáticos</a>.</p>
+    </div>
 </div>
 
-<div class="grid-2col">
-    <div class="coluna-grid">
-        <div class="card">
-            <div class="titulo-card">
-                <span class="icone-card">👥</span>
-                <h2>Usuários do painel</h2>
-            </div>
-            <ul class="lista-usuarios">
-                {% for u in usuarios %}
-                <li>
-                    <span class="usuario-item">
-                        <span class="avatar-usuario">{{ u.username[0]|upper }}</span>
-                        <span>
-                            {{ u.username }}
-                            {% if u.username == usuario_atual %}<span class="dica">(você)</span>{% endif %}
-                            {% if u.is_admin %}<span class="badge-admin">admin</span>{% endif %}
-                        </span>
-                    </span>
+<div class="ajustes">
+    <section class="card" id="usuarios">
+        <div class="card-titulo"><h2>Usuários do painel</h2><button type="button" class="botao peq" id="botaoNovoUsuario">+ Novo usuário</button></div>
+        <table class="usuarios" style="width:100%;border-collapse:collapse"><tbody>
+            {% for u in usuarios %}
+            <tr>
+                <td><span class="nome"><span class="avatar-usuario">{{ u.username[0]|upper }}</span>{{ u.username }}{% if u.username == usuario_atual %} <span class="dica" style="margin:0">(você)</span>{% endif %}</span></td>
+                <td>{% if u.is_admin %}<span class="etiqueta s">Admin</span>{% else %}<span class="etiqueta p">Envia avisos</span>{% endif %}</td>
+                <td class="acao">
                     {% if not u.is_admin and u.username != usuario_atual and usuarios|length > 1 %}
                     <form method="post" onsubmit="return confirm('Remover o usuário {{ u.username }}?')">
                         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                         <input type="hidden" name="acao" value="remover_usuario">
                         <input type="hidden" name="usuario_remover" value="{{ u.username }}">
-                        <button type="submit" class="botao-remover">Remover</button>
+                        <button type="submit" class="botao-link perigo">Remover</button>
                     </form>
                     {% endif %}
-                </li>
-                {% endfor %}
-            </ul>
-        </div>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody></table>
+        <p class="dica rodape-card">O administrador muda lembretes, usuários e acesso. Os outros enviam avisos e cuidam dos modelos.</p>
+    </section>
 
-        <div class="card">
-            <div class="titulo-card">
-                <span class="icone-card">➕</span>
-                <h2>Adicionar novo usuário</h2>
-            </div>
-            <form method="post">
-                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                <input type="hidden" name="acao" value="novo_usuario">
-                <label>Sua senha atual (confirmação de segurança)</label>
-                <input type="password" name="senha_atual_novo_usuario" required>
-                <label>Nome do novo usuário</label>
-                <input type="text" name="novo_usuario_nome" required maxlength="60">
-                <label>Senha do novo usuário</label>
-                <input type="password" name="novo_usuario_senha" required minlength="8">
-                <label>Confirmar senha</label>
-                <input type="password" name="novo_usuario_confirmacao" required minlength="8">
-                <p class="dica">Mínimo 8 caracteres, com maiúscula, minúscula, número e caractere especial.</p>
-                <button type="submit">Criar usuário</button>
-            </form>
-        </div>
-    </div>
-
-    <div class="coluna-grid">
-        <div class="card">
-            <div class="titulo-card">
-                <span class="icone-card">🌐</span>
-                <h2>Rede e acesso</h2>
-            </div>
-
-            <h3>Porta do servidor</h3>
-            <form method="post">
+    <section class="card" id="acesso">
+        <div class="card-titulo"><h2>Acesso e rede</h2></div>
+        <div class="ajuste">
+            <div><b>Porta</b><small>Ao salvar, o painel reabre sozinho na porta nova</small></div>
+            <form method="post" id="formPorta">
                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                 <input type="hidden" name="acao" value="porta">
-                <label>Porta atual: {{ porta_atual }}</label>
-                <input type="number" name="porta" min="1" max="65535" value="{{ porta_atual }}" required>
-                <p class="dica">Alterar a porta exige reiniciar o serviço pra valer: <code>systemctl restart aviso-broadcaster</code></p>
-                <button type="submit">Salvar porta</button>
+                <div class="linha-porta">
+                    <input type="number" name="porta" id="campoPorta" min="1024" max="65535" value="{{ porta_atual }}" required aria-label="Porta do servidor">
+                    <button type="submit" class="botao-secundario">Salvar e aplicar</button>
+                </div>
+                <p class="dica" style="margin:0">Entre 1024 e 65535. Libere a porta nova no firewall antes de trocar.</p>
             </form>
-
-            <hr class="divisor">
-
-            <h3>IPs permitidos (ACL)</h3>
+        </div>
+        <div class="ajuste">
+            <div><b>IPs permitidos</b><small>Um por linha. IPv4 ou IPv6, com ou sem faixa (ex.: 203.0.113.0/24, 2001:db8::/32)</small></div>
             <form method="post">
                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                 <input type="hidden" name="acao" value="acl">
-                <label>Um IP ou faixa CIDR por linha — aceita IPv4 e IPv6 (ex: 203.0.113.10, 203.0.113.0/24, 2001:db8::1 ou 2001:db8::/32)</label>
-                <textarea name="allowed_ips" placeholder="Deixe vazio pra permitir qualquer IP (não recomendado)">{{ allowed_ips }}</textarea>
-                <p class="aviso-acl">Vazio = sem restrição de IP. Recomendado sempre configurar pelo menos o seu IP fixo ou a faixa da sua rede.</p>
-                <button type="submit">Salvar lista de IPs</button>
+                <textarea name="allowed_ips" style="min-height:90px" aria-label="IPs permitidos" placeholder="Vazio libera qualquer IP (não recomendado)">{{ allowed_ips }}</textarea>
+                <div class="acoes">
+                    <button type="submit" class="botao-secundario">Salvar lista</button>
+                    {% if not allowed_ips %}<span class="etiqueta al">Sem restrição de IP</span>{% else %}<span class="etiqueta s">Restrito</span>{% endif %}
+                </div>
             </form>
         </div>
-    </div>
+    </section>
 </div>
 
+<dialog class="janela" id="janelaPorta" aria-labelledby="tituloPorta">
+    <h2 id="tituloPorta">Mudar o painel para a porta <span id="portaNova"></span>?</h2>
+    <p class="dica">O serviço reabre na porta nova e a atual ({{ porta_atual }}) para de responder. Se o firewall do servidor
+        não liberar a porta nova, o painel só volta pelo terminal do servidor.</p>
+    <div class="acoes-dialogo">
+        <button type="button" class="botao-secundario" id="cancelarPorta">Cancelar</button>
+        <button type="button" class="botao" id="confirmarPorta">Mudar e reiniciar</button>
+    </div>
+</dialog>
+
+<dialog class="janela" id="janelaUsuario" aria-labelledby="tituloNovoUsuario">
+    <h2 id="tituloNovoUsuario">Novo usuário</h2>
+    <p class="dica">Ele poderá enviar avisos e cuidar dos modelos.</p>
+    <form method="post" class="formulario" id="formNovoUsuario">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <input type="hidden" name="acao" value="novo_usuario">
+        <div><label class="rotulo" for="novoNome">Nome de usuário</label><input type="text" id="novoNome" name="novo_usuario_nome" required maxlength="60" autocomplete="off"></div>
+        <div><label class="rotulo" for="novaSenha">Senha</label><input type="password" id="novaSenha" name="novo_usuario_senha" required minlength="8" autocomplete="new-password"></div>
+        <div><label class="rotulo" for="novaConfirmacao">Confirmar senha</label><input type="password" id="novaConfirmacao" name="novo_usuario_confirmacao" required minlength="8" autocomplete="new-password"></div>
+        <p class="dica" style="margin:0">Mínimo 8 caracteres, com maiúscula, minúscula, número e caractere especial.</p>
+        <div><label class="rotulo" for="minhaSenha">Sua senha (confirmação)</label><input type="password" id="minhaSenha" name="senha_atual_novo_usuario" required autocomplete="current-password"></div>
+    </form>
+    <div class="acoes-dialogo">
+        <button type="button" class="botao-secundario" id="cancelarNovoUsuario">Cancelar</button>
+        <button type="submit" form="formNovoUsuario">Criar usuário</button>
+    </div>
+</dialog>
+
+<script>
+    (function () {
+        var janela = document.getElementById('janelaUsuario');
+        document.getElementById('botaoNovoUsuario').addEventListener('click', function () {
+            if (typeof janela.showModal === 'function') janela.showModal(); else janela.setAttribute('open', '');
+            document.getElementById('novoNome').focus();
+        });
+        // Troca de porta: confirma antes, porque derruba o endereço atual.
+        var formPorta = document.getElementById('formPorta'), janelaPorta = document.getElementById('janelaPorta');
+        var confirmada = false;
+        formPorta.addEventListener('submit', function (ev) {
+            var valor = document.getElementById('campoPorta').value;
+            if (confirmada || valor === '{{ porta_atual }}' || typeof janelaPorta.showModal !== 'function') return;
+            ev.preventDefault();
+            document.getElementById('portaNova').textContent = valor;
+            janelaPorta.showModal();
+        });
+        document.getElementById('cancelarPorta').addEventListener('click', function () { janelaPorta.close(); });
+        document.getElementById('confirmarPorta').addEventListener('click', function () {
+            confirmada = true;
+            this.disabled = true;
+            this.textContent = 'Reiniciando…';
+            formPorta.submit();
+        });
+
+        document.getElementById('cancelarNovoUsuario').addEventListener('click', function () {
+            document.getElementById('formNovoUsuario').reset();
+            janela.close();
+        });
+    })();
+</script>
 {% endblock %}

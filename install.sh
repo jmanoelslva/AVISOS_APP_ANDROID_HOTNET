@@ -24,11 +24,11 @@ fi
 echo "== Copiando arquivos para $INSTALL_DIR =="
 mkdir -p "$INSTALL_DIR"
 cp -r "$SCRIPT_DIR"/app.py "$SCRIPT_DIR"/config_store.py "$SCRIPT_DIR"/security.py \
-    "$SCRIPT_DIR"/fcm_sender.py "$SCRIPT_DIR"/templates "$SCRIPT_DIR"/requirements.txt \
+    "$SCRIPT_DIR"/fcm_sender.py "$SCRIPT_DIR"/templates "$SCRIPT_DIR"/static "$SCRIPT_DIR"/requirements.txt \
     "$SCRIPT_DIR"/gunicorn.conf.py \
     "$SCRIPT_DIR"/controllr_client.py "$SCRIPT_DIR"/controllr_config.py \
     "$SCRIPT_DIR"/poller.py "$SCRIPT_DIR"/state_store.py \
-    "$SCRIPT_DIR"/access_log.py "$SCRIPT_DIR"/painel_info.py \
+    "$SCRIPT_DIR"/access_log.py "$SCRIPT_DIR"/painel_info.py "$SCRIPT_DIR"/lembretes.py \
     "$INSTALL_DIR"/
 
 if [[ -f "$SCRIPT_DIR/service-account.json" ]]; then

@@ -3,6 +3,43 @@
 Todas as mudanças relevantes do painel de avisos e do poller de eventos por conta.
 Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/).
 
+## [1.3.0] - 2026-10-16
+
+### Adicionado
+- Aba **Automáticos**: funcionamento do poller (último ciclo, próximo, falhas),
+  quantos avisos de cada tipo saíram hoje e os ajustes dos lembretes.
+- Lembrete de vencimento configurável: véspera, 2 a 7 dias antes ou desativado
+  (padrão véspera). A véspera continua com o tipo `boleto_vence_amanha`; 2 a 7
+  dias usam o tipo novo `boleto_vence_em` (com `dias` e `invoice_date_due`), que
+  só o app 2.5.3+ mostra; versões anteriores ignoram.
+- Aviso de boleto em atraso pode ser desativado (desligado, marca como visto sem
+  avisar; ao religar, só os novos atrasos avisam).
+- Horário de envio dos lembretes e atrasos (padrão 08:00 às 20:00; antes o aviso
+  de véspera podia sair de madrugada). Fora do horário, espera o primeiro ciclo
+  dentro dele. Pagamento e chamado continuam na hora.
+- Troca de porta aplicada pelo próprio painel ("Salvar e aplicar"): SIGHUP no
+  Gunicorn, sem root; só 1024 a 65535 e só se a porta estiver livre.
+- Selo "Automáticos ok · HH:MM" no topo (amarelo com falhas, vermelho parado).
+- Enviar: rascunho salvo no navegador e Ctrl+Enter para revisar.
+
+### Alterado
+- Visual: topo grafite com o logotipo oficial, laranja só em ação e seleção.
+- Enviar em três colunas da mesma altura (modelos, texto, celular); prévia numa
+  tela de bloqueio com abas Recolhida, Aberta e No sino; emojis num botão.
+- Modelos em cartões, com editor e prévia numa janela.
+- "Logs" virou **Histórico** (filtros, busca e opção numa linha só) e
+  "Configurações" virou **Ajustes** (usuários e acesso lado a lado; novo
+  usuário numa janela). Os lembretes saíram de Ajustes e foram para Automáticos.
+- `install.sh` copia também `lembretes.py` e a pasta `static/`.
+
+### Como atualizar o servidor
+```bash
+cd /opt/aviso-broadcaster && git pull
+chown -R aviso-broadcaster: /opt/aviso-broadcaster
+systemctl restart aviso-broadcaster
+```
+O poller usa a configuração nova no próximo ciclo (não precisa reiniciar).
+
 ## [1.2.1] - 2026-10-16
 
 ### Corrigido
@@ -94,6 +131,7 @@ Estado em produção desde o piloto de push por conta.
 - Pagamento confirmado usa `invoice_amount_paid` (valor realmente pago) em vez do
   valor do documento.
 
+[1.3.0]: https://github.com/jmanoelslva/AVISOS_APP_ANDROID_HOTNET/compare/v1.2.1...v1.3.0
 [1.2.1]: https://github.com/jmanoelslva/AVISOS_APP_ANDROID_HOTNET/compare/v1.2.0...v1.2.1
 [1.2.0]: https://github.com/jmanoelslva/AVISOS_APP_ANDROID_HOTNET/compare/v1.1.0...v1.2.0
 [1.1.0]: https://github.com/jmanoelslva/AVISOS_APP_ANDROID_HOTNET/compare/v1.0.0...v1.1.0

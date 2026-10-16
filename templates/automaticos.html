@@ -1,0 +1,158 @@
+{% extends "base.html" %}
+{% block titulo %}Automáticos · Avisos HOTNET{% endblock %}
+{% block estilo %}
+        .auto { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.15fr); gap: 16px; align-items: stretch; }
+        .kpis { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+        .kpi { background: var(--cor-superficie-2); border-radius: 11px; padding: 10px 12px; min-width: 0; }
+        .kpi b { display: block; font-size: 20px; font-variant-numeric: tabular-nums; }
+        .kpi .dica { margin: 0; font-size: 12px; }
+        .tipos { margin-top: 14px; flex: 1; display: flex; flex-direction: column; }
+        .tipos .tipo { flex: 1; }
+        .auto > .card { display: flex; flex-direction: column; }
+        .resumo-ciclo { margin-top: auto; padding-top: 12px; border-top: 1px solid var(--cor-borda); }
+        .tipo { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 10px; align-items: center; padding: 10px 0; border-top: 1px solid var(--cor-borda); }
+        .tipo b { display: block; font-size: 13.5px; }
+        .tipo small { color: var(--cor-texto-secundario); font-size: 12px; }
+        .ajuste { display: grid; grid-template-columns: 190px minmax(0, 1fr); gap: 16px; padding: 14px 0; border-top: 1px solid var(--cor-borda); align-items: start; }
+        .ajuste:first-of-type { border-top: none; padding-top: 0; }
+        .ajuste > div:first-child b { display: block; font-size: 13.5px; }
+        .ajuste > div:first-child small { color: var(--cor-texto-secundario); font-size: 12px; }
+        .horas { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+        .horas input { width: auto; padding: 7px 10px; }
+        .trilha { position: relative; height: 26px; margin-top: 10px; border-radius: 7px; background: var(--cor-superficie-2); border: 1px solid var(--cor-borda); overflow: hidden; }
+        .trilha .faixa { position: absolute; top: 0; bottom: 0; background: var(--cor-sucesso-bg); border-left: 2px solid var(--cor-sucesso); border-right: 2px solid var(--cor-sucesso); }
+        .trilha .marcas { position: absolute; inset: 0; display: flex; justify-content: space-between; align-items: center; padding: 0 6px; font-size: 10.5px; color: var(--cor-texto-secundario); font-variant-numeric: tabular-nums; }
+        .frase { margin-top: 12px; background: var(--cor-acento-bg); color: var(--cor-acento-texto); border-radius: 10px; padding: 9px 12px; font-size: 13px; font-weight: 600; }
+        fieldset { border: none; margin: 0; padding: 0; min-width: 0; }
+        fieldset:disabled .segmentado, fieldset:disabled .horas { opacity: 0.7; }
+        @media (max-width: 860px) { .auto { grid-template-columns: minmax(0, 1fr); } }
+        @media (max-width: 560px) { .ajuste { grid-template-columns: minmax(0, 1fr); gap: 8px; } .kpis { gap: 6px; } .kpi { padding: 8px; } .kpi b { font-size: 17px; } }
+{% endblock %}
+{% block conteudo %}
+<div class="cabecalho-pagina">
+    <div>
+        <h1>Notificações automáticas</h1>
+        <p class="dica">O que o sistema avisa sozinho para cada cliente, a partir do Controllr, de hora em hora.</p>
+    </div>
+</div>
+
+<div class="auto">
+    <div class="card">
+        <div class="card-titulo">
+            <h2>Funcionamento</h2>
+            {% if not poller %}<span class="etiqueta p">Sem registros ainda</span>
+            {% elif poller.parado %}<span class="etiqueta f">● Parado</span>
+            {% elif poller.falhas_24h %}<span class="etiqueta al">● Com falhas</span>
+            {% else %}<span class="etiqueta s">● Funcionando</span>{% endif %}
+        </div>
+        {% if poller %}
+        <div class="kpis">
+            <div class="kpi"><span class="rotulo">Último ciclo</span><b class="{{ 'ruim' if poller.parado else 'ok' }}">{{ poller.ultimo_hora }}</b><p class="dica">{{ poller.ultimo_relativo }}</p></div>
+            <div class="kpi"><span class="rotulo">Próximo</span><b>{{ poller.proximo_hora }}</b><p class="dica">{{ poller.intervalo }}</p></div>
+            <div class="kpi"><span class="rotulo">Falhas 24h</span><b class="{{ 'ruim' if poller.falhas_24h else 'ok' }}">{{ poller.falhas_24h }}</b><p class="dica">{% if poller.falhas_24h %}<a href="{{ url_for('logs') }}#falhas">ver no histórico</a>{% else %}nenhuma{% endif %}</p></div>
+        </div>
+        {% if poller.parado %}
+        <p class="dica ruim"><strong>Os automáticos podem estar parados.</strong> No servidor: <code>systemctl list-timers controllr-poller.timer</code></p>
+        {% endif %}
+        {% else %}
+        <p class="dica">Nenhum ciclo registrado. Se o poller foi instalado agora, o primeiro aparece aqui em até 1 hora.</p>
+        {% endif %}
+        <div class="tipos">
+            <span class="rotulo">Enviados hoje</span>
+            <div class="tipo"><div><b>Pagamento confirmado</b><small>Na hora, com a data do pagamento</small></div><span class="etiqueta p">{{ contagens.pagamentos }}</span></div>
+            <div class="tipo"><div><b>Chamado respondido</b><small>Na hora</small></div><span class="etiqueta p">{{ contagens.chamados }}</span></div>
+            <div class="tipo"><div><b>Boleto em atraso</b><small>{% if lembretes.atraso_ativo %}Uma vez por boleto, dentro do horário{% else %}Desativado{% endif %}</small></div><span class="etiqueta p">{{ contagens.atrasos }}</span></div>
+            <div class="tipo"><div><b>Lembrete de vencimento</b><small id="resumoLembrete">{% if lembretes.dias_antes == desativado %}Desativado{% elif lembretes.dias_antes == 1 %}Na véspera, dentro do horário{% else %}{{ lembretes.dias_antes }} dias antes, dentro do horário{% endif %}</small></div><span class="etiqueta p">{{ contagens.lembretes }}</span></div>
+        </div>
+        {% if poller and poller.resumo %}<p class="dica resumo-ciclo"><strong>Último ciclo:</strong> {{ poller.resumo }}</p>{% endif %}
+    </div>
+
+    <div class="card" id="lembretes">
+        <div class="card-titulo"><h2>Lembretes</h2>{% if not usuario_e_admin %}<span class="etiqueta p">Só o administrador altera</span>{% endif %}</div>
+        <form method="post">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <fieldset {% if not usuario_e_admin %}disabled{% endif %}>
+                <div class="ajuste">
+                    <div><b>Avisar antes do vencimento</b><small>Um aviso por boleto ainda não pago</small></div>
+                    <div>
+                        <div class="segmentado" role="radiogroup" aria-label="Antecedência do lembrete">
+                            {% for d in dias_permitidos %}
+                            <label><input type="radio" name="dias_antes" value="{{ d }}" {{ 'checked' if d == lembretes.dias_antes }} required>{{ 'Véspera' if d == 1 else d ~ ' dias' }}</label>
+                            {% endfor %}
+                            <label><input type="radio" name="dias_antes" value="{{ desativado }}" {{ 'checked' if lembretes.dias_antes == desativado }}>Desativado</label>
+                        </div>
+                        <p class="dica" id="dicaDias"></p>
+                    </div>
+                </div>
+                <div class="ajuste">
+                    <div><b>Aviso de boleto em atraso</b><small>Uma vez, quando o boleto atrasa</small></div>
+                    <div>
+                        <div class="segmentado" role="radiogroup" aria-label="Aviso de atraso">
+                            <label><input type="radio" name="atraso_ativo" value="1" {{ 'checked' if lembretes.atraso_ativo }} required>Ativado</label>
+                            <label><input type="radio" name="atraso_ativo" value="0" {{ 'checked' if not lembretes.atraso_ativo }}>Desativado</label>
+                        </div>
+                        <p class="dica">Ao reativar, só os boletos que atrasarem a partir daí recebem o aviso.</p>
+                    </div>
+                </div>
+                <div class="ajuste">
+                    <div><b>Horário de envio</b><small>Atraso e lembrete. Pagamento e chamado chegam na hora.</small></div>
+                    <div>
+                        <div class="horas">
+                            <label for="hIni">Das</label><input type="time" id="hIni" name="inicio" value="{{ lembretes.inicio }}" required step="60">
+                            <label for="hFim">às</label><input type="time" id="hFim" name="fim" value="{{ lembretes.fim }}" required step="60">
+                        </div>
+                        <div class="trilha" aria-hidden="true"><div class="faixa" id="faixa"></div><div class="marcas"><span>0h</span><span>6h</span><span>12h</span><span>18h</span><span>24h</span></div></div>
+                        <p class="dica">Fora do horário, o aviso espera o primeiro ciclo dentro dele. Nada se perde.</p>
+                    </div>
+                </div>
+                <div class="frase" id="frase" aria-live="polite"></div>
+                {% if usuario_e_admin %}
+                <div class="acoes" style="margin-top:14px"><button type="submit">Salvar lembretes</button><p class="dica">Vale a partir do próximo ciclo, sem reiniciar nada.</p></div>
+                {% endif %}
+            </fieldset>
+        </form>
+    </div>
+</div>
+
+<script>
+    (function () {
+        var DESATIVADO = '{{ desativado }}';
+        var DIAS = ['domingo', 'segunda', 'terça', 'quarta', 'quinta', 'sexta', 'sábado'];
+        var ini = document.getElementById('hIni'), fim = document.getElementById('hFim');
+
+        function horas(v) { var p = (v || '00:00').split(':'); return parseInt(p[0], 10) + parseInt(p[1], 10) / 60; }
+        function dd(n) { return String(n).padStart(2, '0'); }
+
+        function atualizar() {
+            var marcado = document.querySelector('input[name=dias_antes]:checked');
+            var d = marcado ? marcado.value : '1';
+            var a = horas(ini.value), z = horas(fim.value);
+            var faixa = document.getElementById('faixa');
+            faixa.style.left = (a / 24 * 100) + '%';
+            faixa.style.width = Math.max(0, (z - a) / 24 * 100) + '%';
+
+            var dica = document.getElementById('dicaDias'), frase = document.getElementById('frase');
+            var atrasoOn = (document.querySelector('input[name=atraso_ativo]:checked') || {}).value !== '0';
+            if (d === DESATIVADO) {
+                dica.textContent = 'Nenhum lembrete de vencimento é enviado.';
+                frase.textContent = 'Lembrete de vencimento desativado. ' + (atrasoOn
+                    ? 'O aviso de atraso continua, das ' + ini.value + ' às ' + fim.value + '.'
+                    : 'O aviso de atraso também está desativado: só pagamento e chamado são avisados.');
+                return;
+            }
+            var n = parseInt(d, 10);
+            dica.textContent = n === 1 ? 'Funciona em todas as versões do app.' : 'Aparece no app a partir da versão 2.5.3; as anteriores ignoram em silêncio.';
+            // Exemplo com um vencimento real: a próxima sexta-feira.
+            var venc = new Date(); venc.setHours(12, 0, 0, 0);
+            venc.setDate(venc.getDate() + ((5 - venc.getDay() + 7) % 7 || 7));
+            var envio = new Date(venc); envio.setDate(venc.getDate() - n);
+            frase.textContent = 'Boleto que vence ' + DIAS[venc.getDay()] + ' (' + dd(venc.getDate()) + '/' + dd(venc.getMonth() + 1) + '): o cliente recebe o lembrete ' +
+                (n === 1 ? 'na véspera, ' : '') + DIAS[envio.getDay()] + ' (' + dd(envio.getDate()) + '/' + dd(envio.getMonth() + 1) + '), a partir das ' + ini.value + '.';
+        }
+        document.querySelectorAll('input[name=dias_antes], input[name=atraso_ativo]').forEach(function (r) { r.addEventListener('change', atualizar); });
+        ini.addEventListener('input', atualizar);
+        fim.addEventListener('input', atualizar);
+        atualizar();
+    })();
+</script>
+{% endblock %}

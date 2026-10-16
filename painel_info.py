@@ -21,8 +21,10 @@ _EVENTOS = {
     "usuario_criado": ("Usuário criado", {"acessos"}, "a"),
     "usuario_removido": ("Usuário removido", {"acessos"}, "a"),
     "senha_alterada": ("Senha alterada", {"acessos"}, "a"),
-    "poller_ciclo": ("Ciclo do poller", {"poller"}, "p"),
-    "poller_falha": ("Falha no poller", {"poller", "falhas"}, "f"),
+    "lembretes_alterados": ("Lembretes alterados", {"acessos"}, "a"),
+    "porta_alterada": ("Porta alterada", {"acessos"}, "a"),
+    "poller_ciclo": ("Ciclo automático", {"poller"}, "p"),
+    "poller_falha": ("Falha automática", {"poller", "falhas"}, "f"),
 }
 
 _FORMATO = "%Y-%m-%d %H:%M:%S"
@@ -110,6 +112,39 @@ def status_poller(eventos: list[dict]) -> dict | None:
         "parado": parado,
         "resumo": ciclos[0].get("detalhes", "") if ciclos else "",
     }
+
+
+# Contagem do dia por tipo, somando os ciclos de hoje (texto gravado pelo poller.py).
+_CONTAGENS = {
+    "pagamentos": re.compile(r"\((\d+) pagamentos notificados\)"),
+    "chamados": re.compile(r"chamados \((\d+) notificados\)"),
+    "atrasos": re.compile(r"(\d+) atrasos notificados"),
+    "lembretes": re.compile(r"(\d+) (?:lembretes de vencimento|vence-amanhã) notificados"),
+}
+
+
+def contagens_hoje(eventos: list[dict]) -> dict:
+    hoje = datetime.now().date()
+    total = {chave: 0 for chave in _CONTAGENS}
+    for e in eventos:
+        if e.get("evento") != "poller_ciclo" or not (q := _quando(e)) or q.date() != hoje:
+            continue
+        for chave, regex in _CONTAGENS.items():
+            total[chave] += sum(int(n) for n in regex.findall(e.get("detalhes", "")))
+    return total
+
+
+def status_topo(eventos: list[dict]) -> dict | None:
+    """Selo do topo: ok / alerta (falhas em 24h) / parado. None sem poller."""
+    st = status_poller(eventos)
+    if st is None:
+        return None
+    if st["parado"]:
+        return {"nivel": "parado", "texto": "Automáticos parados"}
+    if st["falhas_24h"]:
+        n = st["falhas_24h"]
+        return {"nivel": "alerta", "texto": f"{n} falha{'s' if n > 1 else ''} · {st['ultimo_hora']}"}
+    return {"nivel": "ok", "texto": f"Automáticos ok · {st['ultimo_hora']}"}
 
 
 def agora_hhmm() -> str:

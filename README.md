@@ -90,24 +90,28 @@ diretamente na tela de login.
    escolheu no `install.sh`, ou 8765 por padrão).
 2. Entre com o usuário e a senha que você definiu (via `install.sh` ou
    pela tela de primeiro acesso).
-3. Vá em **Configurações** e cadastre pelo menos o seu próprio IP (ou
+3. Vá em **Ajustes** e cadastre pelo menos o seu próprio IP (ou
    a faixa da sua rede/VPN) na lista de IPs permitidos — por padrão,
    sem essa lista, qualquer IP consegue acessar a tela de login. Aceita
    IPv4 e IPv6 (o Gunicorn escuta em `[::]`, que no Debian já responde
    pelos dois automaticamente — não precisa configurar nada a mais).
-4. Se quiser mudar a porta depois, salve o novo valor em Configurações
-   e rode `systemctl restart aviso-broadcaster` (a porta só é lida na
-   inicialização do processo).
-5. Pra dar acesso a mais pessoas, use "Adicionar novo usuário" em
-   Configurações (pede sua própria senha atual como confirmação). Não
+4. Para mudar a porta depois, use **Ajustes → Acesso e rede → Salvar e
+   aplicar** (1024 a 65535). O painel manda SIGHUP para o Gunicorn, que relê
+   `gunicorn.conf.py` e passa a escutar na porta nova, sem root nem
+   `systemctl`; a página leva ao endereço novo. Libere a porta no firewall
+   antes. Se algo der errado, edite `port` em `config.json` e rode
+   `systemctl restart aviso-broadcaster`.
+5. Pra dar acesso a mais pessoas, use "+ Novo usuário" em
+   Ajustes (pede sua própria senha atual como confirmação). Não
    dá pra remover a si mesmo nem o último usuário restante, pra evitar
-   ficar todo mundo trancado pra fora. **A página de Configurações
+   ficar todo mundo trancado pra fora. **A página de Ajustes
    (porta, IPs, gerenciar usuários) só fica visível e acessível pra
    quem é o usuário administrador** (o primeiro criado, marcado como
-   "admin" na lista) — os demais usuários só veem as abas "Enviar
-   aviso", "Modelos", "Logs" e "Minha senha".
+   "admin" na lista) — os demais usuários só veem as abas "Enviar",
+   "Automáticos" (sem poder alterar os lembretes), "Modelos", "Histórico"
+   e "Minha senha".
 6. Qualquer usuário (admin ou não) troca a própria senha em
-   "Minha senha", sem precisar de acesso a Configurações.
+   "Minha senha", sem precisar de acesso a Ajustes.
 
 ## 4. Importante — use HTTPS na frente
 
@@ -119,7 +123,7 @@ internet (e não só pela sua rede interna/VPN) — pode ser Nginx ou, como
 já é o caso da instalação atual, **Apache**.
 
 Exemplo mínimo de `VirtualHost` do Apache fazendo proxy pra esse painel
-(ajuste a porta pro valor configurado em Configurações):
+(ajuste a porta pro valor configurado em Ajustes):
 
 ```apache
 <VirtualHost *:443>
@@ -136,7 +140,7 @@ Exemplo mínimo de `VirtualHost` do Apache fazendo proxy pra esse painel
 ```
 
 O `mod_proxy` do Apache já envia `X-Forwarded-For` sozinho (é assim que
-a lista de IPs permitidos em Configurações identifica o IP real do
+a lista de IPs permitidos em Ajustes identifica o IP real do
 cliente); o `X-Forwarded-Proto` acima **precisa** ser configurado à mão
 (diferente do Nginx, o Apache não manda esse cabeçalho por padrão).
 
@@ -165,9 +169,9 @@ botão fica desabilitado durante o envio, pra evitar clique duplo
 mandando o aviso duas vezes. Ao enviar, todo cliente com o app
 instalado e conectado à internet recebe a notificação em poucos
 segundos. Se o envio falhar (ex: Firebase fora do ar), a tela mostra um
-aviso genérico e o detalhe técnico fica registrado na aba "Logs".
+aviso genérico e o detalhe técnico fica registrado na aba "Histórico".
 
-A aba **"Logs"** mostra o histórico de login (sucesso/falha), avisos
+A aba **"Histórico"** mostra o histórico de login (sucesso/falha), avisos
 enviados (e falhas de envio), e alterações de usuário — os últimos 500
 eventos, guardados localmente em `acessos.log` (não versionado no
 git). Tem um campo de busca no topo pra filtrar por usuário, IP ou tipo
@@ -275,9 +279,18 @@ pra quem já foi notificado:
   própria ação da pessoa.
 - **Fatura atrasada**: `invoice_late` vira `true` — empurrão único (não
   repete todo ciclo enquanto continuar atrasada), lembrando do prazo de
-  bloqueio do fornecimento (vencimento + 7 dias corridos).
-- **Boleto vence amanhã**: `invoice_date_due` é amanhã e a fatura ainda
-  não foi paga — empurrão único. Substitui por completo o antigo
+  bloqueio do fornecimento (vencimento + 7 dias corridos). Pode ser
+  desativado na aba **Automáticos**; desligado, o poller marca os atrasos
+  como vistos sem avisar (ao religar, só os novos avisam).
+- **Horário de envio** (aba **Automáticos**, padrão 08:00 às 20:00): atraso
+  e lembrete de vencimento só saem nesse horário; fora dele esperam o
+  primeiro ciclo dentro. Pagamento e chamado saem na hora. Configuração em
+  `config.json` (chave `lembretes`), lida a cada ciclo — ver `lembretes.py`.
+- **Lembrete de vencimento**: `invoice_date_due` está a N dias e a fatura
+  ainda não foi paga — empurrão único. N se escolhe no painel, aba
+  **Automáticos** (véspera, 2 a 7 dias ou desativado; padrão véspera). A
+  véspera usa o tipo `boleto_vence_amanha` (todas as versões do app);
+  2 a 7 dias usam `boleto_vence_em` (app 2.5.3+, as anteriores ignoram). Substitui por completo o antigo
   `VencimentoWorker` (WorkManager no app, removido) — mesma ação
   "Copiar código Pix" preservada (`invoice_qrcode` vai no payload como
   `pix_code`).
@@ -341,7 +354,7 @@ systemctl daemon-reload
 systemctl enable --now controllr-poller.timer
 ```
 
-5. Acompanhe pela aba **Logs** do painel (eventos `poller_ciclo` e
+5. Acompanhe pela aba **Histórico** do painel (eventos `poller_ciclo` e
    `poller_falha`) — reaproveita o mesmo `access_log.py` dos outros
    eventos.
 

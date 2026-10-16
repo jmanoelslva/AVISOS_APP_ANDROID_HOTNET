@@ -2,9 +2,18 @@
 painel, pra manter o fluxo de "trocar a porta em Configurações e reiniciar
 o serviço" funcionando igual ao antes.
 """
+import json
+
 import config_store
 
-_cfg = config_store.carregar()
+# Lido direto do disco (não pelo cache de config_store): ao trocar a porta no
+# painel, o app manda SIGHUP pro master, que reexecuta este arquivo e passa a
+# escutar na porta nova. Com o cache, o master continuaria vendo a porta antiga.
+try:
+    with open(config_store.CONFIG_PATH, "r", encoding="utf-8") as _f:
+        _cfg = json.load(_f)
+except (OSError, ValueError):
+    _cfg = config_store.carregar()
 
 # "[::]" (IPv6 wildcard) já aceita conexões IPv4 também, no Linux com o
 # padrão net.ipv6.bindv6only=0 (caso do Debian) — é uma única escuta
