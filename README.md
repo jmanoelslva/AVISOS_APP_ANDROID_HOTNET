@@ -172,10 +172,21 @@ segundos. Se o envio falhar (ex: Firebase fora do ar), a tela mostra um
 aviso genérico e o detalhe técnico fica registrado na aba "Histórico".
 
 A aba **"Histórico"** mostra o histórico de login (sucesso/falha), avisos
-enviados (e falhas de envio), e alterações de usuário — os últimos 500
+enviados (e falhas de envio), e alterações de usuário — os últimos 1000
 eventos, guardados localmente em `acessos.log` (não versionado no
 git). Tem um campo de busca no topo pra filtrar por usuário, IP ou tipo
 de evento.
+
+Em **Notificações** (dentro do Histórico) fica cada aviso automático do
+poller com o cliente: tipo (pagamento confirmado, cobrança de atraso,
+lembrete antecipado, chamado respondido), nome, CPF/CNPJ completo e o que
+foi avisado (valor, vencimento, contrato ou número do chamado). Envio que
+falhou aparece com o motivo. Cartões coloridos no topo contam cada tipo
+no período (hoje, 7 ou 30 dias) e filtram a lista com um clique; a busca
+aceita nome, CPF com ou sem pontos, contrato e número do chamado. Fica em
+`envios.log` (permissão 600, fora do git), separado do `acessos.log`, e
+guarda só os últimos 30 dias. Envios de teste feitos à mão, fora do
+poller, não aparecem ali.
 
 ## 6. Atualizando uma instalação já existente
 

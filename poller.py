@@ -16,12 +16,31 @@ import sys
 
 import access_log
 import controllr_config
+import envios_log
 import lembretes
 import state_store
 from controllr_client import ControllrClient
 from fcm_sender import enviar_para_conta
 
 _SO_DIGITOS = re.compile(r"\D+")
+
+# Envios do ciclo, com cliente e CPF, para a visão Notificações do Histórico
+# (envios_log.py). Gravados de uma vez no fim do main().
+_envios: list[dict] = []
+
+
+def _anotar(tipo: str, registro: dict, dados: dict, erro: Exception | None = None) -> None:
+    """tipo: "pag" (pagamento), "atr" (atraso), "ant" (lembrete de vencimento) ou "cha" (chamado)."""
+    entrada = {
+        "tipo": tipo,
+        "ok": erro is None,
+        "cliente": registro.get("client_name") or "",
+        "doc": registro.get("client_doc1") or "",
+        **{chave: str(valor) for chave, valor in dados.items() if valor not in (None, "")},
+    }
+    if erro is not None:
+        entrada["erro"] = str(erro)[:200]
+    _envios.append(entrada)
 
 
 def topico_conta_cpf(cpf: str) -> str:
@@ -62,6 +81,12 @@ def processar_pagamentos(faturas: list[dict], estado: dict, primeira_vez: bool) 
         if credito_atual and not credito_anterior and not primeira_vez and _fatura_vale_notificar(fatura):
             cpf = fatura.get("client_doc1") or ""
             if cpf:
+                anotacao = {
+                    "contrato": fatura.get("contract_number"),
+                    "valor": fatura.get("invoice_amount_paid"),
+                    "pago_em": (credito_atual or "")[:10],
+                    "vencimento": (fatura.get("invoice_date_due") or "")[:10],
+                }
                 try:
                     enviar_para_conta(
                         topico_conta_cpf(cpf),
@@ -81,8 +106,10 @@ def processar_pagamentos(faturas: list[dict], estado: dict, primeira_vez: bool) 
                         },
                     )
                     notificadas += 1
+                    _anotar("pag", fatura, anotacao)
                 except Exception as e:
                     access_log.registrar("poller_falha", detalhes=f"envio fatura {pk}: {e}")
+                    _anotar("pag", fatura, anotacao, e)
 
         faturas_vistas[pk] = credito_atual
 
@@ -120,6 +147,11 @@ def processar_atrasos(faturas: list[dict], estado: dict, primeira_vez: bool, no_
                 continue
             cpf = fatura.get("client_doc1") or ""
             if cpf:
+                anotacao = {
+                    "contrato": fatura.get("contract_number"),
+                    "valor": fatura.get("invoice_amount_document"),
+                    "vencimento": (fatura.get("invoice_date_due") or "")[:10],
+                }
                 try:
                     enviar_para_conta(
                         topico_conta_cpf(cpf),
@@ -133,8 +165,10 @@ def processar_atrasos(faturas: list[dict], estado: dict, primeira_vez: bool, no_
                     )
                     notificadas += 1
                     atrasadas_vistas[pk] = True
+                    _anotar("atr", fatura, anotacao)
                 except Exception as e:
                     access_log.registrar("poller_falha", detalhes=f"envio atraso fatura {pk}: {e}")
+                    _anotar("atr", fatura, anotacao, e)
         elif fatura.get("invoice_late"):
             # Já notificado antes (ou baseline) — só garante que fica marcado,
             # sem reenviar.
@@ -198,12 +232,20 @@ def processar_vencimentos(faturas: list[dict], estado: dict, primeira_vez: bool,
         if tipo == "boleto_vence_em":
             dados["dias"] = str(dias)
             dados["invoice_date_due"] = vencimento.isoformat()
+        anotacao = {
+            "contrato": fatura.get("contract_number"),
+            "valor": fatura.get("invoice_amount_document"),
+            "vencimento": vencimento.isoformat(),
+            "dias": dias,
+        }
         try:
             enviar_para_conta(topico_conta_cpf(cpf), tipo, dados)
             notificadas += 1
             vistas[chave] = True
+            _anotar("ant", fatura, anotacao)
         except Exception as e:
             access_log.registrar("poller_falha", detalhes=f"envio lembrete {dias}d fatura {pk}: {e}")
+            _anotar("ant", fatura, anotacao, e)
 
     # Limpa lembretes de boletos que já venceram (o estado não cresce para sempre).
     hoje_iso = hoje.isoformat()
@@ -227,6 +269,10 @@ def processar_chamados(cliente: ControllrClient, estado: dict, primeira_vez_cham
         if ultimo_atual and ultimo_atual != ultimo_anterior and not primeira_vez_chamados:
             cpf = chamado.get("client_doc1") or ""
             if cpf:
+                anotacao = {
+                    "protocolo": chamado.get("ticket_protocol") or pk_str,
+                    "assunto": chamado.get("category_name"),
+                }
                 try:
                     # Só notifica se quem mexeu por último foi a equipe, não
                     # o próprio cliente respondendo pelo app (op_client=True
@@ -243,15 +289,17 @@ def processar_chamados(cliente: ControllrClient, estado: dict, primeira_vez_cham
                             },
                         )
                         notificadas += 1
+                        _anotar("cha", chamado, anotacao)
                 except Exception as e:
                     access_log.registrar("poller_falha", detalhes=f"envio chamado {pk_str}: {e}")
+                    _anotar("cha", chamado, anotacao, e)
 
         chamados_vistos[pk_str] = ultimo_atual
 
     return len(chamados), notificadas
 
 
-def main() -> int:
+def _ciclo() -> int:
     try:
         cfg = controllr_config.carregar()
     except RuntimeError as e:
@@ -318,6 +366,19 @@ def main() -> int:
         partes.append(f"lembretes e atrasos aguardando o horário ({cfg_lembretes['inicio']} às {cfg_lembretes['fim']})")
     access_log.registrar("poller_ciclo", detalhes=", ".join(partes))
     return 0
+
+
+def main() -> int:
+    try:
+        return _ciclo()
+    finally:
+        # Também quando o ciclo para no meio (ex.: falha nos chamados depois de
+        # já ter avisado pagamentos): o que saiu precisa aparecer no Histórico.
+        try:
+            envios_log.registrar_lote(_envios)
+        except Exception as e:
+            access_log.registrar("poller_falha", detalhes=f"gravar histórico de envios: {e}")
+        _envios.clear()
 
 
 if __name__ == "__main__":

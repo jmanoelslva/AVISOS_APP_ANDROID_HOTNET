@@ -4,5 +4,7 @@ __pycache__/
 config.json
 service-account.json
 acessos.log
+envios.log
+.envios-*
 controllr_config.json
 poller_state.json

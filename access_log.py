@@ -6,7 +6,7 @@ LOG_PATH = Path(__file__).resolve().parent / "acessos.log"
 
 # Evita que o arquivo cresça pra sempre — mantém só os eventos mais
 # recentes.
-MAX_LINHAS = 500
+MAX_LINHAS = 1000
 
 
 def registrar(evento: str, usuario: str = "", ip: str = "", detalhes: str = "", mensagem: str = "") -> None:

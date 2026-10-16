@@ -13,6 +13,7 @@ from flask_wtf.csrf import CSRFError
 from werkzeug.security import check_password_hash, generate_password_hash
 
 import access_log
+import envios_log
 import config_store
 import lembretes
 import painel_info
@@ -397,7 +398,9 @@ def automaticos():
 def logs():
     eventos = painel_info.eventos_para_tabela(access_log.listar(limite=access_log.MAX_LINHAS))
     falhas = sum(1 for e in eventos if "falhas" in e["categorias"].split())
-    return render_template("logs.html", eventos=eventos, total_falhas=falhas)
+    envios = painel_info.envios_para_tabela(envios_log.listar())
+    return render_template("logs.html", eventos=eventos, total_falhas=falhas, envios=envios,
+                           dias_envios=envios_log.DIAS_RETENCAO)
 
 
 @app.route("/minha-senha", methods=["GET", "POST"])

@@ -149,3 +149,109 @@ def status_topo(eventos: list[dict]) -> dict | None:
 
 def agora_hhmm() -> str:
     return time.strftime("%H:%M")
+
+
+# ---- Notificações por cliente (envios.log, gravado pelo poller) ----
+
+_TIPOS_ENVIO = {
+    "pag": "Pagamento confirmado",
+    "atr": "Cobrança de atraso",
+    "ant": "Lembrete antecipado",
+    "cha": "Chamado respondido",
+}
+# Bloqueio do fornecimento = vencimento + 7 dias corridos (regra do provedor, a mesma do app).
+_DIAS_ATE_BLOQUEIO = 7
+
+
+def formatar_documento(doc: str) -> str:
+    """CPF 000.000.000-00, CNPJ 00.000.000/0000-00; outro formato fica como veio."""
+    d = re.sub(r"\D", "", doc or "")
+    if len(d) == 11:
+        return f"{d[:3]}.{d[3:6]}.{d[6:9]}-{d[9:]}"
+    if len(d) == 14:
+        return f"{d[:2]}.{d[2:5]}.{d[5:8]}/{d[8:12]}-{d[12:]}"
+    return doc or ""
+
+
+def _moeda(valor: str | None) -> str:
+    try:
+        numero = float(valor)
+    except (TypeError, ValueError):
+        return ""
+    return "R$ " + f"{numero:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+
+
+def _dia_mes(iso: str | None) -> str:
+    try:
+        return datetime.strptime((iso or "")[:10], "%Y-%m-%d").strftime("%d/%m")
+    except ValueError:
+        return ""
+
+
+def _partes_envio(e: dict) -> list[tuple[str, bool]]:
+    """Trechos de "O que foi avisado" como (texto, destaque); o template escapa cada um."""
+    tipo = e.get("tipo")
+    contrato = e.get("contrato")
+    partes: list[tuple[str, bool]] = []
+    if tipo == "pag":
+        partes += [(_moeda(e.get("valor")), True), (f"pago em {_dia_mes(e.get('pago_em'))}", False),
+                   (f"venc. {_dia_mes(e.get('vencimento'))}", False)]
+    elif tipo == "atr":
+        bloqueio = ""
+        try:
+            bloqueio = (datetime.strptime(e.get("vencimento", "")[:10], "%Y-%m-%d")
+                        + timedelta(days=_DIAS_ATE_BLOQUEIO)).strftime("%d/%m")
+        except ValueError:
+            pass
+        partes += [(f"venceu {_dia_mes(e.get('vencimento'))}", False), (_moeda(e.get("valor")), True),
+                   (f"bloqueio em {bloqueio}" if bloqueio else "", False)]
+    elif tipo == "ant":
+        dias = e.get("dias", "")
+        quando = "amanhã" if dias == "1" else f"em {dias} dias"
+        partes += [(f"vence {quando}", True), (f"({_dia_mes(e.get('vencimento'))})", False),
+                   (_moeda(e.get("valor")), False)]
+    elif tipo == "cha":
+        partes += [(f"chamado nº {e.get('protocolo', '')}", True), (e.get("assunto", ""), False)]
+    if contrato and tipo != "cha":
+        partes.append((f"contrato {contrato}", False))
+    if not e.get("ok", True):
+        partes.append((f"não enviado: {e.get('erro', 'erro desconhecido')}", False))
+    return [(texto, forte) for texto, forte in partes if texto and texto != "()"]
+
+
+def _dia_e_hora(momento: datetime | None, agora: datetime) -> str:
+    """Separador de ciclo sempre com a hora: 'hoje 18:00', 'ontem 23:00', '12/10 09:00'."""
+    if momento is None:
+        return ""
+    if momento.date() == agora.date():
+        return "hoje " + momento.strftime("%H:%M")
+    if momento.date() == (agora - timedelta(days=1)).date():
+        return "ontem " + momento.strftime("%H:%M")
+    return momento.strftime("%d/%m %H:%M")
+
+
+def envios_para_tabela(envios: list[dict]) -> list[dict]:
+    agora = datetime.now()
+    saida = []
+    for e in envios:
+        tipo = e.get("tipo", "")
+        if tipo not in _TIPOS_ENVIO:
+            continue
+        momento = _quando(e)
+        ok = e.get("ok", True)
+        doc = formatar_documento(e.get("doc", ""))
+        saida.append({
+            "quando": e.get("quando", ""),
+            "data": momento.strftime("%Y-%m-%d") if momento else "",
+            "relativo": hora_relativa(momento, agora) or e.get("quando", ""),
+            "ciclo": _dia_e_hora(momento, agora),
+            "tipo": tipo,
+            "classe": tipo if ok else "fal",
+            "rotulo": _TIPOS_ENVIO[tipo] if ok else "Falha: " + _TIPOS_ENVIO[tipo].lower(),
+            "ok": ok,
+            "cliente": e.get("cliente") or "Cliente sem nome no cadastro",
+            "doc": doc,
+            "doc_digitos": re.sub(r"\D", "", doc),
+            "partes": _partes_envio(e),
+        })
+    return saida

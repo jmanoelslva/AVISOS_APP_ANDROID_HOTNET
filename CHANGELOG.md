@@ -3,6 +3,35 @@
 Todas as mudanças relevantes do painel de avisos e do poller de eventos por conta.
 Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/).
 
+## [1.4.0] - 2026-10-16
+
+### Adicionado
+- Histórico → **Notificações**: cada aviso automático do poller com o cliente
+  (nome, CPF/CNPJ completo) e o que foi avisado: pagamento confirmado (valor,
+  data do pagamento, vencimento, contrato), cobrança de atraso (vencimento,
+  valor, data de bloqueio), lembrete antecipado (quantos dias faltam, valor)
+  e chamado respondido (número e assunto). Envio que falhou aparece com o motivo.
+- Cartões coloridos por tipo (verde, vermelho, âmbar, azul) com a contagem do
+  período escolhido (hoje, 7 ou 30 dias) e o total de clientes avisados; clicar
+  num cartão filtra a lista. Busca por nome, CPF com ou sem pontos, contrato ou
+  número do chamado.
+- `envios_log.py`: o poller grava uma linha por envio em `envios.log`
+  (permissão 600, fora do git), guardado por 30 dias. Separado do `acessos.log`
+  para um lote grande não empurrar logins e avisos para fora do histórico.
+
+### Alterado
+- Histórico guarda os últimos 1000 eventos (antes 500).
+- `install.sh` copia também `envios_log.py`.
+
+### Como atualizar o servidor
+```bash
+cd /opt/aviso-broadcaster && git pull
+chown -R aviso-broadcaster: /opt/aviso-broadcaster
+systemctl restart aviso-broadcaster
+```
+O poller pega o código novo sozinho no próximo ciclo. A lista de Notificações
+começa vazia e se preenche a partir dele.
+
 ## [1.3.0] - 2026-10-16
 
 ### Adicionado

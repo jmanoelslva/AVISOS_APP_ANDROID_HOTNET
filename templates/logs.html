@@ -3,70 +3,161 @@
 {% block estilo %}
         .ferramentas { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-bottom: 12px; }
         .ferramentas input[type=search] { width: 260px; max-width: 100%; padding: 8px 12px; }
+        .ferramentas select { width: auto; padding: 8px 12px; }
         .opcao-check { display: inline-flex; align-items: center; gap: 6px; margin-left: auto; font-size: 13px; color: var(--cor-texto-secundario); }
         .opcao-check input { accent-color: var(--cor-acento); }
+        .opcao-check[hidden] { display: none; }
         .tabela-logs { min-width: 680px; }
         .tabela-logs td.evento { width: 160px; }
         .tabela-logs td.quem { width: 110px; }
         .tabela-logs td.ip { width: 140px; color: var(--cor-texto-secundario); font-size: 12px; overflow-wrap: anywhere; }
         .tabela-logs td.detalhes { overflow-wrap: anywhere; }
+
+        /* Notificações por cliente: cada tipo com uma cor, a mesma no cartão, no botão e na etiqueta. */
+        .k-pag { --k-cor: var(--cor-sucesso); --k-bg: var(--cor-sucesso-bg); }
+        .k-atr { --k-cor: var(--cor-erro); --k-bg: var(--cor-erro-bg); }
+        .k-ant { --k-cor: var(--cor-alerta); --k-bg: var(--cor-alerta-bg); }
+        .k-cha { --k-cor: var(--cor-info); --k-bg: var(--cor-info-bg); }
+        .k-cli { --k-cor: var(--cor-acento-texto); --k-bg: var(--cor-acento-bg); }
+        .resumo-envios { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 10px; margin-bottom: 14px; }
+        .kpi-envio { font: inherit; text-align: left; background: var(--k-bg); border: 1px solid transparent; border-radius: var(--raio-pequeno);
+            padding: 10px 12px; display: grid; gap: 2px; color: var(--cor-texto); width: auto; box-shadow: none; }
+        button.kpi-envio { cursor: pointer; }
+        button.kpi-envio:hover { background: var(--k-bg); filter: brightness(0.97); }
+        .kpi-envio b { font-size: 22px; font-variant-numeric: tabular-nums; color: var(--k-cor); }
+        .kpi-envio span { font-size: 12px; font-weight: 500; color: var(--cor-texto-secundario); display: flex; align-items: center; gap: 6px; }
+        .kpi-envio span::before, .tipos-envio button.k-pag::before, .tipos-envio button.k-atr::before,
+        .tipos-envio button.k-ant::before, .tipos-envio button.k-cha::before {
+            content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--k-cor); flex: none; display: inline-block; }
+        .tipos-envio button::before { margin-right: 6px; }
+        .kpi-envio[aria-pressed="true"] { border-color: var(--k-cor); box-shadow: 0 0 0 1px var(--k-cor) inset; }
+        .kpi-envio:focus-visible { outline: 2px solid var(--k-cor); outline-offset: 2px; }
+        .tabela-envios { min-width: 760px; }
+        .tabela-envios td.tipo { width: 170px; }
+        .tabela-envios td.cliente { font-weight: 600; }
+        .tabela-envios td.doc { white-space: nowrap; font-family: ui-monospace, "Cascadia Mono", Consolas, monospace; font-size: 12px; color: var(--cor-texto-secundario); }
+        .tabela-envios td.avisado { color: var(--cor-texto-secundario); overflow-wrap: anywhere; }
+        .tabela-envios td.avisado strong { color: var(--cor-texto); font-weight: 600; }
+        .tabela-envios tr.ciclo td { background: var(--cor-superficie-2); font-size: 12px; color: var(--cor-texto-secundario); padding-block: 6px; }
+        .etiqueta.t-pag { background: var(--cor-sucesso-bg); color: var(--cor-sucesso); }
+        .etiqueta.t-atr { background: var(--cor-erro-bg); color: var(--cor-erro); }
+        .etiqueta.t-ant { background: var(--cor-alerta-bg); color: var(--cor-alerta); }
+        .etiqueta.t-cha { background: var(--cor-info-bg); color: var(--cor-info); }
+        .etiqueta.t-fal { background: var(--cor-erro-bg); color: var(--cor-erro); border: 1px dashed var(--cor-erro); }
+        @media (max-width: 860px) { .resumo-envios { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+        @media (max-width: 520px) { .resumo-envios { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 {% endblock %}
 {% block conteudo %}
 <div class="cabecalho-pagina">
     <div>
         <h1>Histórico</h1>
-        <p class="dica">Avisos, acessos, alterações e ciclos automáticos, mais recentes primeiro (últimos 500 eventos).</p>
+        <p class="dica">Avisos, acessos, alterações e ciclos automáticos (últimos 1000 eventos). Em <b>Notificações</b>, cada aviso automático com o cliente, guardado por {{ dias_envios }} dias.</p>
     </div>
 </div>
 
 <div class="card">
-    {% if eventos %}
     <div class="ferramentas">
         <div class="segmentado" role="group" aria-label="Filtrar por tipo">
             <button type="button" data-filtro="" aria-pressed="true">Tudo</button>
             <button type="button" data-filtro="avisos" aria-pressed="false">Avisos</button>
             <button type="button" data-filtro="acessos" aria-pressed="false">Acessos</button>
             <button type="button" data-filtro="poller" aria-pressed="false">Automáticos</button>
+            <button type="button" data-filtro="notificacoes" aria-pressed="false">Notificações</button>
             <button type="button" data-filtro="falhas" aria-pressed="false">Falhas · {{ total_falhas }}</button>
         </div>
         <input type="search" id="filtroLogs" placeholder="Buscar usuário, IP ou texto" aria-label="Buscar no histórico">
-        <label class="opcao-check"><input type="checkbox" id="mostrarCiclosVazios"> Ciclos sem notificação</label>
+        <label class="opcao-check" id="opcaoCiclos"><input type="checkbox" id="mostrarCiclosVazios"> Ciclos sem notificação</label>
     </div>
-    <div class="rolavel">
-        <table class="tabela tabela-logs">
-            <thead>
-                <tr><th>Quando</th><th>Evento</th><th>Quem</th><th>Detalhes</th><th>IP</th></tr>
-            </thead>
-            <tbody>
-                {% for e in eventos %}
-                <tr data-cat="{{ e.categorias }}" data-vazio="{{ '1' if e.ciclo_vazio else '0' }}">
-                    <td class="quando" title="{{ e.quando }}">{{ e.relativo }}</td>
-                    <td class="evento"><span class="etiqueta {{ e.classe }}">{{ e.rotulo }}</span></td>
-                    <td class="quem">{{ e.quem }}</td>
-                    <td class="detalhes">{% if e.evento == 'aviso_enviado' %}<strong>{{ e.detalhes }}</strong>{% if e.mensagem %} · {{ e.mensagem }}{% endif %}{% else %}{{ e.detalhes }}{% endif %}</td>
-                    <td class="ip">{{ e.ip }}</td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
+
+    <div id="visaoEventos">
+        {% if eventos %}
+        <div class="rolavel">
+            <table class="tabela tabela-logs">
+                <thead>
+                    <tr><th>Quando</th><th>Evento</th><th>Quem</th><th>Detalhes</th><th>IP</th></tr>
+                </thead>
+                <tbody>
+                    {% for e in eventos %}
+                    <tr data-cat="{{ e.categorias }}" data-vazio="{{ '1' if e.ciclo_vazio else '0' }}">
+                        <td class="quando" title="{{ e.quando }}">{{ e.relativo }}</td>
+                        <td class="evento"><span class="etiqueta {{ e.classe }}">{{ e.rotulo }}</span></td>
+                        <td class="quem">{{ e.quem }}</td>
+                        <td class="detalhes">{% if e.evento == 'aviso_enviado' %}<strong>{{ e.detalhes }}</strong>{% if e.mensagem %} · {{ e.mensagem }}{% endif %}{% else %}{{ e.detalhes }}{% endif %}</td>
+                        <td class="ip">{{ e.ip }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        <p class="dica" id="filtroSemResultado" hidden>Nenhum evento corresponde ao filtro.</p>
+        {% else %}
+        <p class="dica">Nenhum evento registrado ainda.</p>
+        {% endif %}
     </div>
-    <p class="dica" id="filtroSemResultado" hidden>Nenhum evento corresponde ao filtro.</p>
-    {% else %}
-    <p class="dica">Nenhum evento registrado ainda.</p>
-    {% endif %}
+
+    <div id="visaoEnvios" hidden>
+        <div class="resumo-envios" aria-label="Notificações no período">
+            <button type="button" class="kpi-envio k-pag" data-tipo="pag" aria-pressed="false"><b id="kPag">0</b><span>Pagamentos confirmados</span></button>
+            <button type="button" class="kpi-envio k-atr" data-tipo="atr" aria-pressed="false"><b id="kAtr">0</b><span>Cobranças de atraso</span></button>
+            <button type="button" class="kpi-envio k-ant" data-tipo="ant" aria-pressed="false"><b id="kAnt">0</b><span>Lembretes antecipados</span></button>
+            <button type="button" class="kpi-envio k-cha" data-tipo="cha" aria-pressed="false"><b id="kCha">0</b><span>Chamados respondidos</span></button>
+            <div class="kpi-envio k-cli"><b id="kCli">0</b><span>Clientes avisados</span></div>
+        </div>
+        <div class="ferramentas">
+            <div class="segmentado tipos-envio" role="group" aria-label="Tipo de notificação">
+                <button type="button" data-tipo="" aria-pressed="true">Todas</button>
+                <button type="button" class="k-pag" data-tipo="pag" aria-pressed="false">Pagamento</button>
+                <button type="button" class="k-atr" data-tipo="atr" aria-pressed="false">Atraso</button>
+                <button type="button" class="k-ant" data-tipo="ant" aria-pressed="false">Antecipada</button>
+                <button type="button" class="k-cha" data-tipo="cha" aria-pressed="false">Chamado</button>
+            </div>
+            <input type="search" id="buscaEnvios" placeholder="Nome, CPF, contrato ou nº do chamado" aria-label="Buscar notificação">
+            <select id="periodoEnvios" aria-label="Período">
+                <option value="0">Hoje</option>
+                <option value="6">Últimos 7 dias</option>
+                <option value="{{ dias_envios - 1 }}">Últimos {{ dias_envios }} dias</option>
+            </select>
+        </div>
+        {% if envios %}
+        <div class="rolavel">
+            <table class="tabela tabela-envios">
+                <thead><tr><th>Quando</th><th>Tipo</th><th>Cliente</th><th>CPF/CNPJ</th><th>O que foi avisado</th></tr></thead>
+                <tbody>
+                    {% for n in envios %}
+                    {% if loop.first or n.quando != envios[loop.index0 - 1].quando %}
+                    <tr class="ciclo" data-ciclo="{{ n.quando }}"><td colspan="5">Ciclo de {{ n.ciclo }}</td></tr>
+                    {% endif %}
+                    <tr class="envio" data-ciclo="{{ n.quando }}" data-data="{{ n.data }}" data-tipo="{{ n.tipo }}" data-ok="{{ '1' if n.ok else '0' }}" data-doc="{{ n.doc_digitos }}">
+                        <td class="quando" title="{{ n.quando }}">{{ n.relativo }}</td>
+                        <td class="tipo"><span class="etiqueta t-{{ n.classe }}">{{ n.rotulo }}</span></td>
+                        <td class="cliente">{{ n.cliente }}</td>
+                        <td class="doc">{{ n.doc }}</td>
+                        <td class="avisado">{% for texto, forte in n.partes %}{% if not loop.first %} · {% endif %}{% if forte %}<strong>{{ texto }}</strong>{% else %}{{ texto }}{% endif %}{% endfor %}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% endif %}
+        <p class="dica" id="enviosSemResultado" {% if not envios %}hidden{% endif %}>Nenhuma notificação corresponde ao filtro.</p>
+        {% if not envios %}<p class="dica">Nenhuma notificação automática registrada ainda. Elas aparecem aqui a partir do próximo ciclo do poller.</p>{% endif %}
+    </div>
 </div>
 
 <script>
     (function () {
+        var botoes = document.querySelectorAll('[data-filtro]');
         var campo = document.getElementById('filtroLogs');
-        if (!campo) return;
+        var opcaoCiclos = document.getElementById('opcaoCiclos');
+        var mostrarVazios = document.getElementById('mostrarCiclosVazios');
+        var visaoEventos = document.getElementById('visaoEventos');
+        var visaoEnvios = document.getElementById('visaoEnvios');
         var linhas = document.querySelectorAll('.tabela-logs tbody tr');
         var semResultado = document.getElementById('filtroSemResultado');
-        var mostrarVazios = document.getElementById('mostrarCiclosVazios');
-        var botoes = document.querySelectorAll('[data-filtro]');
         var filtro = '';
 
         function aplicar() {
+            if (!semResultado) return;
             var termo = campo.value.trim().toLowerCase();
             var visiveis = 0;
             linhas.forEach(function (linha) {
@@ -84,14 +175,78 @@
         function escolher(valor) {
             filtro = valor;
             botoes.forEach(function (x) { x.setAttribute('aria-pressed', x.dataset.filtro === valor ? 'true' : 'false'); });
-            aplicar();
+            var envios = valor === 'notificacoes';
+            visaoEnvios.hidden = !envios;
+            visaoEventos.hidden = envios;
+            campo.hidden = envios;
+            opcaoCiclos.hidden = envios;
+            if (!envios) aplicar();
         }
         botoes.forEach(function (b) { b.addEventListener('click', function () { escolher(b.dataset.filtro); }); });
         campo.addEventListener('input', aplicar);
         mostrarVazios.addEventListener('change', aplicar);
+
+        // ---- Notificações por cliente ----
+        var tipo = '';
+        var seletores = document.querySelectorAll('.tipos-envio button, button.kpi-envio');
+        var busca = document.getElementById('buscaEnvios');
+        var periodo = document.getElementById('periodoEnvios');
+        var envios = document.querySelectorAll('.tabela-envios tr.envio');
+        var ciclos = document.querySelectorAll('.tabela-envios tr.ciclo');
+        var semEnvios = document.getElementById('enviosSemResultado');
+
+        function dataLimite() {
+            var d = new Date();
+            d.setDate(d.getDate() - parseInt(periodo.value, 10));
+            var mes = String(d.getMonth() + 1).padStart(2, '0'), dia = String(d.getDate()).padStart(2, '0');
+            return d.getFullYear() + '-' + mes + '-' + dia;
+        }
+
+        function filtrarEnvios() {
+            var limite = dataLimite();
+            var termo = busca.value.trim().toLowerCase();
+            var termoDigitos = termo.replace(/\D/g, '');
+            var contagem = { pag: 0, atr: 0, ant: 0, cha: 0 }, clientes = {}, cicloVisivel = {}, visiveis = 0;
+            envios.forEach(function (linha) {
+                var noPeriodo = linha.dataset.data >= limite;
+                // Os cartões contam o período inteiro (só envios que saíram), sem o filtro de tipo e a busca.
+                if (noPeriodo && linha.dataset.ok === '1') {
+                    contagem[linha.dataset.tipo]++;
+                    if (linha.dataset.doc) clientes[linha.dataset.doc] = 1;
+                }
+                var bateBusca = !termo || linha.textContent.toLowerCase().includes(termo) ||
+                    (termoDigitos.length >= 3 && linha.dataset.doc.includes(termoDigitos));
+                var bate = noPeriodo && (!tipo || linha.dataset.tipo === tipo) && bateBusca;
+                linha.hidden = !bate;
+                if (bate) { visiveis++; cicloVisivel[linha.dataset.ciclo] = 1; }
+            });
+            ciclos.forEach(function (c) { c.hidden = !cicloVisivel[c.dataset.ciclo]; });
+            document.getElementById('kPag').textContent = contagem.pag;
+            document.getElementById('kAtr').textContent = contagem.atr;
+            document.getElementById('kAnt').textContent = contagem.ant;
+            document.getElementById('kCha').textContent = contagem.cha;
+            document.getElementById('kCli').textContent = Object.keys(clientes).length;
+            if (envios.length) semEnvios.hidden = visiveis !== 0;
+        }
+
+        // Cartões e botões de tipo filtram juntos; clicar de novo no cartão ativo volta para Todas.
+        function escolherTipo(valor) {
+            tipo = valor;
+            seletores.forEach(function (x) { x.setAttribute('aria-pressed', x.dataset.tipo === valor ? 'true' : 'false'); });
+            filtrarEnvios();
+        }
+        seletores.forEach(function (b) {
+            b.addEventListener('click', function () {
+                escolherTipo(b.classList.contains('kpi-envio') && tipo === b.dataset.tipo ? '' : b.dataset.tipo);
+            });
+        });
+        busca.addEventListener('input', filtrarEnvios);
+        periodo.addEventListener('change', filtrarEnvios);
+        filtrarEnvios();
+
         // Link "ver no histórico" das falhas (Automáticos) chega com #falhas.
         var inicial = location.hash.replace('#', '');
-        escolher(['avisos', 'acessos', 'poller', 'falhas'].indexOf(inicial) >= 0 ? inicial : '');
+        escolher(['avisos', 'acessos', 'poller', 'notificacoes', 'falhas'].indexOf(inicial) >= 0 ? inicial : '');
     })();
 </script>
 {% endblock %}
