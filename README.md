@@ -257,7 +257,8 @@ categoria (`faturas`/`faturas_atrasadas`/`faturas_vence_amanha`/
 pra quem já foi notificado:
 
 - **Pagamento confirmado**: `invoice_date_credit` passa de vazio pra
-  preenchido.
+  preenchido. O payload leva valor pago, contrato, vencimento e, desde a
+  v1.1.0, a própria `invoice_date_credit` (o app mostra "Pago em dd/mm/aaaa").
 - **Chamado atualizado**: `ticket_date_last` muda **e** a última
   operação do chamado (`support_ctl/op/list`) foi escrita pela equipe
   (`op_client=False`) — se foi o próprio cliente quem mexeu por último

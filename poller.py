@@ -73,6 +73,9 @@ def processar_pagamentos(faturas: list[dict], estado: dict, primeira_vez: bool) 
                             # fica errado quase 1 em cada 4 vezes.
                             "invoice_amount_paid": fatura.get("invoice_amount_paid") or "",
                             "invoice_date_due": fatura.get("invoice_date_due") or "",
+                            # Dia em que o pagamento caiu (o mesmo "Pago em" da tela
+                            # Boletos do app): a notificação mostra "Pago em dd/mm/aaaa".
+                            "invoice_date_credit": credito_atual or "",
                         },
                     )
                     notificadas += 1
