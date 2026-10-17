@@ -148,7 +148,7 @@ fi
 echo ""
 echo "== Poller de eventos por conta (pagamento confirmado, chamado"
 echo "   atualizado, fatura atrasada) — opcional =="
-echo "Consulta o Controllr periodicamente (a cada 10min) como um usuário"
+echo "Consulta o Controllr periodicamente (a cada 1 hora) como um usuário"
 echo "ADMIN dedicado, só leitura, numa porta diferente da área de cliente"
 echo "(8080/8081/8443, conforme configurado no seu Controllr). Não altera"
 echo "nada no Controllr, só lê. Detalhes: README.md, seção 9."
@@ -189,7 +189,7 @@ PYEOF
         systemctl daemon-reload
         systemctl enable --now controllr-poller.timer
         POLLER_INSTALADO=1
-        echo "Poller instalado e rodando (controllr-poller.timer, a cada 10min)."
+        echo "Poller instalado e rodando (controllr-poller.timer, a cada 1 hora)."
     else
         echo ""
         echo "AVISO: a primeira execução do poller falhou (veja o erro acima —"

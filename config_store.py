@@ -1,6 +1,8 @@
 import json
 import os
 import secrets
+import tempfile
+import threading
 import uuid
 from pathlib import Path
 
@@ -11,6 +13,8 @@ CONFIG_PATH = Path(__file__).resolve().parent / "config.json"
 DEFAULT_PORT = 8765
 
 _config_cache = None
+# Painel com threads (gunicorn gthread): uma gravação por vez.
+_trava = threading.RLock()
 
 
 def _templates_padrao() -> list[dict]:
@@ -152,13 +156,24 @@ def carregar() -> dict:
 
 
 def salvar(config: dict) -> None:
+    """Grava num temporário e troca de uma vez: quem lê ao mesmo tempo (o poller,
+    o Gunicorn ao trocar a porta) vê sempre o arquivo inteiro, antigo ou novo.
+    Contém hashes de senha e a secret key de sessão: permissão 600."""
     global _config_cache
-    _config_cache = config
-    with open(CONFIG_PATH, "w", encoding="utf-8") as f:
-        json.dump(config, f, indent=2, ensure_ascii=False)
-    # Contém o hash da senha e a secret key de sessão — só o dono do
-    # processo precisa conseguir ler.
-    try:
-        os.chmod(CONFIG_PATH, 0o600)
-    except OSError:
-        pass
+    with _trava:
+        _config_cache = config
+        fd, temporario = tempfile.mkstemp(prefix=".config-", dir=CONFIG_PATH.parent)
+        try:
+            with os.fdopen(fd, "w", encoding="utf-8") as f:
+                json.dump(config, f, indent=2, ensure_ascii=False)
+            try:
+                os.chmod(temporario, 0o600)
+            except OSError:
+                pass
+            os.replace(temporario, CONFIG_PATH)
+        except BaseException:
+            try:
+                os.unlink(temporario)
+            except OSError:
+                pass
+            raise

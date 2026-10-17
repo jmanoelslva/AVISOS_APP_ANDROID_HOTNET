@@ -6,5 +6,6 @@ service-account.json
 acessos.log
 envios.log
 .envios-*
+.config-*
 controllr_config.json
 poller_state.json

@@ -1,4 +1,5 @@
 import json
+import threading
 import time
 from pathlib import Path
 
@@ -7,6 +8,10 @@ LOG_PATH = Path(__file__).resolve().parent / "acessos.log"
 # Evita que o arquivo cresça pra sempre — mantém só os eventos mais
 # recentes.
 MAX_LINHAS = 1000
+
+# O painel roda com threads (gunicorn gthread): sem trava, duas gravações ao
+# mesmo tempo leriam o arquivo antigo e uma das linhas se perderia.
+_trava = threading.Lock()
 
 
 def registrar(evento: str, usuario: str = "", ip: str = "", detalhes: str = "", mensagem: str = "") -> None:
@@ -20,14 +25,15 @@ def registrar(evento: str, usuario: str = "", ip: str = "", detalhes: str = "", 
     # Texto do aviso enviado: "Últimos avisos" do painel oferece "Usar de novo".
     if mensagem:
         entrada["mensagem"] = mensagem
-    linhas = []
-    if LOG_PATH.exists():
-        with open(LOG_PATH, "r", encoding="utf-8") as f:
-            linhas = f.readlines()
-    linhas.append(json.dumps(entrada, ensure_ascii=False) + "\n")
-    linhas = linhas[-MAX_LINHAS:]
-    with open(LOG_PATH, "w", encoding="utf-8") as f:
-        f.writelines(linhas)
+    with _trava:
+        linhas = []
+        if LOG_PATH.exists():
+            with open(LOG_PATH, "r", encoding="utf-8") as f:
+                linhas = f.readlines()
+        linhas.append(json.dumps(entrada, ensure_ascii=False) + "\n")
+        linhas = linhas[-MAX_LINHAS:]
+        with open(LOG_PATH, "w", encoding="utf-8") as f:
+            f.writelines(linhas)
 
 
 def listar(limite: int = 200) -> list[dict]:

@@ -11,6 +11,18 @@ systemctl restart aviso-broadcaster
 ```
 O poller roda por timer e usa o código novo no ciclo seguinte, sem reinício.
 
+## [1.6.1] - 2026-10-16
+Partes: painel e poller (timer).
+
+### Corrigido
+- Lentidão intermitente: o worker `sync` do Gunicorn atendia uma conexão por vez e travava o painel até 30 s numa conexão aberta sem pedido (pré-conexão do Chrome). Agora `gthread` com 4 threads, em 1 processo.
+- Gravação concorrente: trava em `acessos.log` e `config.json`.
+- `config.json` gravado num temporário e trocado de uma vez; o poller e o Gunicorn nunca leem o arquivo pela metade.
+
+### Alterado
+- Fonte: Manrope, a mesma do app, servida pelo painel (`static/fonts`, WOFF2, ~16 KB por peso). Sai o Google Fonts; nenhuma página depende de servidor externo.
+- `controllr-poller.timer`: 1 hora (antes 10 min no repositório; o servidor já usava 1 hora). README e `install.sh` atualizados.
+
 ## [1.6.0] - 2026-10-16
 Partes: painel e instalador.
 
@@ -162,6 +174,7 @@ Partes: painel e poller. Estado em produção desde o piloto.
 - `invoice_valid=false` é pagamento manual no escritório, não cliente inativo.
 - Pagamento confirmado usa `invoice_amount_paid` em vez de `invoice_amount_document`.
 
+[1.6.1]: https://github.com/jmanoelslva/AVISOS_APP_ANDROID_HOTNET/compare/v1.6.0...v1.6.1
 [1.6.0]: https://github.com/jmanoelslva/AVISOS_APP_ANDROID_HOTNET/compare/v1.5.0...v1.6.0
 [1.5.0]: https://github.com/jmanoelslva/AVISOS_APP_ANDROID_HOTNET/compare/v1.4.1...v1.5.0
 [1.4.1]: https://github.com/jmanoelslva/AVISOS_APP_ANDROID_HOTNET/compare/v1.4.0...v1.4.1

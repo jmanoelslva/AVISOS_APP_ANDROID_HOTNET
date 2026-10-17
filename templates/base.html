@@ -18,10 +18,15 @@
             } catch (e) {}
         })();
     </script>
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="preload" href="{{ url_for('static', filename='fonts/manrope-400.woff2') }}" as="font" type="font/woff2" crossorigin>
+    <link rel="preload" href="{{ url_for('static', filename='fonts/manrope-700.woff2') }}" as="font" type="font/woff2" crossorigin>
     <style>
+        /* Manrope, a mesma fonte do app HOTNET, servida pelo próprio painel (sem Google Fonts:
+           a página não espera um servidor externo). SIL Open Font License 1.1, ver static/fonts. */
+        {% for peso in (400, 500, 600, 700, 800) %}
+        @font-face { font-family: "Manrope"; font-style: normal; font-weight: {{ peso }}; font-display: swap;
+            src: url("{{ url_for('static', filename='fonts/manrope-' ~ peso ~ '.woff2') }}") format("woff2"); }
+        {% endfor %}
         /* 1.3.0: topo grafite (cor do app), laranja só em ação e seleção,
            páginas em colunas para caber numa tela. */
         :root {
@@ -109,7 +114,7 @@
         * { box-sizing: border-box; }
         body {
             margin: 0;
-            font-family: "Plus Jakarta Sans", -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+            font-family: "Manrope", -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
             font-size: 14px;
             line-height: 1.45;
             background: var(--cor-fundo);

@@ -1,9 +1,9 @@
 [Unit]
-Description=Roda o Controllr Poller a cada 10 minutos
+Description=Roda o Controllr Poller a cada 1 hora
 
 [Timer]
 OnBootSec=2min
-OnUnitActiveSec=10min
+OnUnitActiveSec=1h
 Unit=controllr-poller.service
 
 [Install]

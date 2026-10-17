@@ -284,8 +284,8 @@ sistema `aviso-broadcaster`.
 
 O visual do painel foi alinhado ao do app HOTNET (`WEB_APPS/HOTNET_WEB_APP`):
 
-- **Fonte:** Plus Jakarta Sans (mesma do web app), carregada via Google
-  Fonts.
+- **Fonte:** Manrope, a mesma do app HOTNET, servida pelo próprio painel
+  (`static/fonts`, WOFF2, licença SIL OFL 1.1). Não depende do Google Fonts.
 - **Cores de marca:** o laranja/vermelho do gradiente (`#F28F3B` →
   `#D94A38`) já é o mesmo `--cor-primaria`/`--cor-primaria-escura` usado
   lá — não precisou trocar.
@@ -315,8 +315,8 @@ pra todo mundo. Não altera nada no Controllr, só lê (`invoice_ctl/invoice/lis
 `support_ctl/ticket/list`, `support_ctl/op/list`) com um usuário dedicado.
 
 **Por que existe**: o Controllr não tem webhook/push próprio, então "em
-tempo real" aqui significa "checagem periódica" (a cada 10min, por
-padrão) — o poller guarda o que já viu em `poller_state.json`, por
+tempo real" aqui significa "checagem periódica" (a cada 1 hora, por
+padrão, para não encher o log de acesso do Controllr) — o poller guarda o que já viu em `poller_state.json`, por
 categoria (`faturas`/`faturas_atrasadas`/`faturas_vence_amanha`/
 `chamados`), e só notifica em cima de uma transição real, nunca de novo
 pra quem já foi notificado:
@@ -410,7 +410,7 @@ systemctl enable --now controllr-poller.timer
    `poller_falha`) — reaproveita o mesmo `access_log.py` dos outros
    eventos.
 
-Pra mudar o intervalo (padrão 10min): edite `OnUnitActiveSec` em
+Pra mudar o intervalo (padrão 1 hora): edite `OnUnitActiveSec` em
 `controllr-poller.timer`, depois `systemctl daemon-reload && systemctl restart controllr-poller.timer`.
 
 `controllr_config.json` e `poller_state.json` seguem o mesmo padrão de

@@ -24,13 +24,17 @@ _porta = _cfg.get("port", config_store.DEFAULT_PORT)
 # escuta apenas em 127.0.0.1, e o acesso de fora é só por HTTPS.
 bind = f"127.0.0.1:{_porta}" if _cfg.get("dominio") else f"[::]:{_porta}"
 
-# Só 1 worker de propósito: o bloqueio por tentativas de login errado
-# (_tentativas_login, em app.py) é guardado em memória do processo — com
-# mais de um worker, cada processo teria sua própria contagem e o
-# bloqueio de 5 tentativas viraria "5 tentativas por worker". Painel de
-# baixo tráfego, uso único (um admin), não precisa de concorrência real.
+# Só 1 processo de propósito: o bloqueio por tentativas de login errado
+# (_tentativas_login, em app.py) é guardado em memória — com mais de um
+# processo, cada um teria sua própria contagem e o bloqueio de 5 tentativas
+# viraria "5 tentativas por processo". Threads dividem a mesma memória.
 workers = 1
-worker_class = "sync"
+# gthread, não sync: o sync atende uma conexão por vez e fica preso numa
+# conexão aberta sem pedido (o Chrome abre essas "de reserva"), travando o
+# painel para todos até 30 s. O gthread só ocupa uma thread quando chega
+# dado na conexão. Gravações em arquivo têm trava (access_log, config_store).
+worker_class = "gthread"
+threads = 4
 
 accesslog = "-"
 errorlog = "-"

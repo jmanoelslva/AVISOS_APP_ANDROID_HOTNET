@@ -1,0 +1,5 @@
+Manrope 4.505 — a mesma fonte do app HOTNET (res/font), convertida para WOFF2
+e reduzida aos caracteres latinos (português com acentos), pesos 400 a 800.
+
+Copyright 2019 The Manrope Project Authors (https://github.com/googlefonts/manrope)
+Licença: SIL Open Font License, Version 1.1 — https://openfontlicense.org
