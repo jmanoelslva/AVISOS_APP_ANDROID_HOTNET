@@ -258,6 +258,24 @@
         .botao-link:hover { background: var(--cor-acento-bg); }
         .botao-link.discreto { color: var(--cor-texto-secundario); font-weight: 600; }
         .botao-link.perigo { color: var(--cor-erro); }
+        /* Campo de senha com regras à vista (_senha.html). */
+        .campo-senha { display: grid; gap: 6px; }
+        .senha-linha { display: flex; gap: 6px; align-items: center; }
+        .senha-linha input { flex: 1; min-width: 0; font-family: ui-monospace, "Cascadia Mono", Consolas, monospace; }
+        .senha-linha .botao-secundario { white-space: nowrap; }
+        .regras-senha { list-style: none; margin: 2px 0 6px; padding: 10px 12px; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px 14px;
+            background: var(--cor-superficie-2); border: 1px solid var(--cor-borda); border-radius: var(--raio-pequeno); font-size: 12.5px; }
+        .regras-senha li { display: flex; align-items: center; gap: 7px; color: var(--cor-texto-secundario); }
+        .regras-senha li::before { content: ""; width: 14px; height: 14px; border-radius: 50%; border: 2px solid var(--cor-borda); flex: none; box-sizing: border-box; }
+        .regras-senha li.ok { color: var(--cor-sucesso); }
+        .regras-senha li.ok::before { border-color: var(--cor-sucesso); background: var(--cor-sucesso); box-shadow: inset 0 0 0 2px var(--cor-superficie-2); }
+        .regras-senha li.largo { grid-column: 1 / -1; }
+        .regras-senha code { font-size: 12px; white-space: nowrap; }
+        .confere-senha { margin: 0; font-size: 12.5px; min-height: 18px; color: var(--cor-texto-secundario); }
+        .confere-senha.ok { color: var(--cor-sucesso); }
+        .confere-senha.erro { color: var(--cor-erro); }
+        button:disabled { opacity: .5; cursor: not-allowed; }
+        @media (max-width: 520px) { .regras-senha { grid-template-columns: minmax(0, 1fr); } }
         .peq { padding: 6px 12px; font-size: 13px; }
         .acoes { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
         .acoes .dica { margin: 0; }

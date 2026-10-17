@@ -38,6 +38,9 @@ O script:
   mínimo 8 caracteres, maiúscula, minúscula, número e caractere
   especial — o script já valida antes de aceitar);
 - pergunta a porta do painel (padrão 8765);
+- **pergunta o domínio (opcional)**. Com domínio, chama o
+  `configurar-dominio.sh` (seção 4): HTTPS com Let's Encrypt e renovação
+  automática. Sem domínio, o acesso é por `http://IP:PORTA`;
 - instala e inicia o serviço systemd do painel;
 - **pergunta se quer configurar o poller de eventos por conta** (opcional
   — pagamento confirmado, chamado atualizado, fatura atrasada, ver
@@ -123,10 +126,18 @@ diretamente na tela de login.
      um existente. Grupo com usuários não pode ser excluído.
    - Abas sem permissão somem do topo; o servidor recusa o acesso mesmo por
      link direto ou formulário montado à mão.
+   - **Editar** (em cada usuário): grupo, situação (ativo/bloqueado) e nova
+     senha, que é opcional; em branco, mantém a atual.
    - Trocar o grupo ou as permissões vale no próximo clique do usuário.
-     Bloquear ou remover encerra a sessão aberta no próximo clique.
-   - Ninguém bloqueia, remove ou troca o grupo do próprio usuário.
-   - "+ Novo usuário" pede a senha de quem está criando.
+     Trocar a senha, bloquear ou remover encerra a sessão aberta dele.
+   - Ninguém edita nem remove o próprio usuário por Ajustes; a própria
+     senha muda em "Minha senha", que encerra as outras sessões abertas.
+   - "+ Novo usuário" e "Editar" não pedem a senha de quem está alterando.
+   - **Regras da senha**, mostradas e marcadas enquanto se digita (o
+     servidor confere de novo): 8 a 128 caracteres, uma letra maiúscula
+     (A–Z), uma minúscula (a–z), um número (0–9) e um símbolo (qualquer
+     caractere fora de A–Z, a–z e 0–9, ex.: `! @ # $ % & * - _ .`).
+     "Gerar" cria uma senha aleatória de 14 caracteres.
    - Tudo fica registrado no Histórico.
    - Dados em `config.json`: `grupos` (nome e permissões) e, em cada
      usuário, `grupo` e `ativo`. `is_admin` continua gravado para permitir
@@ -134,46 +145,55 @@ diretamente na tela de login.
 6. Qualquer usuário troca a própria senha em "Minha senha", sem precisar
    de acesso a Ajustes.
 
-## 4. Importante — use HTTPS na frente
+## 4. Domínio e HTTPS (opcional)
 
-Esse servidor roda em HTTP simples, o que significa que a senha viaja
-sem criptografia entre o seu navegador e o servidor. Recomendado
-fortemente colocar um proxy reverso com **HTTPS (Let's Encrypt/certbot)**
-na frente dessa porta, especialmente se o servidor for acessível pela
-internet (e não só pela sua rede interna/VPN) — pode ser Nginx ou, como
-já é o caso da instalação atual, **Apache**.
+Sem domínio, o painel responde em `http://IP:PORTA` e a senha trafega sem
+criptografia. Use só em rede interna/VPN, com a lista de IPs permitidos.
 
-Exemplo mínimo de `VirtualHost` do Apache fazendo proxy pra esse painel
-(ajuste a porta pro valor configurado em Ajustes):
+Com domínio, o painel fica em `https://SEU_DOMINIO`:
 
-```apache
-<VirtualHost *:443>
-    ServerName SEU_DOMINIO
-
-    ProxyPreserveHost On
-    ProxyPass / http://127.0.0.1:8765/
-    ProxyPassReverse / http://127.0.0.1:8765/
-    RequestHeader set X-Forwarded-Proto "https"
-
-    SSLEngine on
-    # ... SSLCertificateFile / SSLCertificateKeyFile (certbot) ...
-</VirtualHost>
+```bash
+cd /opt/aviso-broadcaster
+./configurar-dominio.sh painel.exemplo.com.br email@exemplo.com.br   # ativar
+./configurar-dominio.sh --remover                                     # voltar ao IP
 ```
 
-O `mod_proxy` do Apache já envia `X-Forwarded-For` sozinho (é assim que
-a lista de IPs permitidos em Ajustes identifica o IP real do
-cliente); o `X-Forwarded-Proto` acima **precisa** ser configurado à mão
-(diferente do Nginx, o Apache não manda esse cabeçalho por padrão).
+Requisitos: o domínio apontando (registro A e/ou AAAA) para este servidor e
+as portas 80 e 443 liberadas. O e-mail é opcional; sem ele, o Let's Encrypt
+não avisa se a renovação falhar.
 
-Com o Apache terminando HTTPS, ligue o cookie de sessão como *secure*
-definindo a variável de ambiente `AVISO_BROADCASTER_HTTPS=1` no serviço
-systemd (edite `/etc/systemd/system/aviso-broadcaster.service`,
-adicione `Environment="AVISO_BROADCASTER_HTTPS=1"` na seção `[Service]`
-e rode `systemctl daemon-reload && systemctl restart aviso-broadcaster`).
-Sem isso, o cookie continua funcionando normalmente, só sem essa camada
-extra de proteção — não ative se o Apache ainda não tiver HTTPS
-configurado, senão o login para de funcionar (o navegador não manda o
-cookie de volta por HTTP).
+O script:
+- confere o DNS do domínio (avisa se não apontar para este servidor);
+- usa o **Apache** se já estiver rodando no servidor; senão instala o **Nginx**;
+- cria o site com proxy para `127.0.0.1:PORTA` e emite o certificado com o
+  certbot, redirecionando HTTP para HTTPS. Se o certificado falhar, remove o
+  site, e o painel nunca fica exposto pelo domínio só em HTTP;
+- ativa a renovação automática (`certbot.timer`, duas vezes ao dia, renova
+  com 30 dias de antecedência; o certbot recarrega o servidor web) e testa
+  com `certbot renew --dry-run`;
+- libera 80/443 no `ufw`, se ele estiver ativo;
+- grava `dominio` no `config.json` e cria
+  `/etc/systemd/system/aviso-broadcaster.service.d/dominio.conf` com
+  `AVISO_BROADCASTER_HTTPS=1` (cookie de sessão só por HTTPS) e
+  `AVISO_BROADCASTER_PROXY=1` (IP real do cliente vem do proxy);
+- reinicia o painel escutando só em `127.0.0.1`: o acesso por `IP:PORTA`
+  deixa de existir.
+
+Com domínio, a porta não muda por Ajustes (ela é interna); Ajustes mostra o
+endereço HTTPS. A lista de IPs permitidos continua valendo, com o IP real do
+cliente.
+
+Conferir a renovação:
+
+```bash
+systemctl list-timers certbot.timer
+certbot certificates
+```
+
+**IP do cliente e lista de IPs permitidos.** O cabeçalho `X-Forwarded-For`
+só é aceito com `AVISO_BROADCASTER_PROXY=1` e em conexões vindas do próprio
+servidor (127.0.0.1/::1), e vale o último item, o que o proxy acrescenta.
+Sem proxy, vale o IP da conexão.
 
 Todo formulário do painel (login, envio de aviso, modelos, usuários,
 configurações) tem proteção contra CSRF (`Flask-WTF`) — se aparecer o

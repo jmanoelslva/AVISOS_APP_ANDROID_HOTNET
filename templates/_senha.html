@@ -1,0 +1,101 @@
+{# Campo de senha com as regras à vista (marcadas enquanto digita), Mostrar, Gerar e
+   conferência da confirmação. As regras são as de security.py; o servidor confere de novo.
+   Uso: {% import "_senha.html" as senha %} ... {{ senha.campo("novo", "novo_usuario_senha", "novo_usuario_confirmacao") }}
+   e uma vez por página {{ senha.script() }}. #}
+
+{% macro campo(prefixo, nome, nome_confirmacao, rotulo="Senha", opcional=False, gerar=True) %}
+<div class="campo-senha" data-senha {% if opcional %}data-opcional{% endif %}>
+    <label class="rotulo" for="{{ prefixo }}Senha">{{ rotulo }}</label>
+    {% if opcional %}<p class="dica" style="margin:-2px 0 0">Deixe em branco para manter a senha atual.</p>{% endif %}
+    <div class="senha-linha">
+        <input type="password" id="{{ prefixo }}Senha" name="{{ nome }}" class="entrada-senha" maxlength="128"
+               autocomplete="new-password" {% if not opcional %}required{% endif %}>
+        <button type="button" class="botao-secundario peq senha-mostrar">Mostrar</button>
+        {% if gerar %}<button type="button" class="botao-secundario peq senha-gerar" title="Gerar uma senha forte de 14 caracteres">Gerar</button>{% endif %}
+    </div>
+    <ul class="regras-senha" aria-live="polite">
+        <li data-regra="tamanho"><span>8 a 128 caracteres</span></li>
+        <li data-regra="maiuscula"><span>Uma letra maiúscula (A–Z)</span></li>
+        <li data-regra="minuscula"><span>Uma letra minúscula (a–z)</span></li>
+        <li data-regra="numero"><span>Um número (0–9)</span></li>
+        <li data-regra="simbolo" class="largo"><span>Um símbolo, ex.: <code>! @ # $ % &amp; * - _ .</code></span></li>
+    </ul>
+    <label class="rotulo" for="{{ prefixo }}Confirmacao">Confirmar {{ rotulo|lower }}</label>
+    <input type="password" id="{{ prefixo }}Confirmacao" name="{{ nome_confirmacao }}" class="confirmar-senha" maxlength="128"
+           autocomplete="new-password" {% if not opcional %}required{% endif %}>
+    <p class="confere-senha" aria-live="polite"></p>
+</div>
+{% endmacro %}
+
+{% macro script() %}
+<script>
+    (function () {
+        var REGRAS = {
+            tamanho: function (s) { return s.length >= 8 && s.length <= 128; },
+            maiuscula: function (s) { return /[A-Z]/.test(s); },
+            minuscula: function (s) { return /[a-z]/.test(s); },
+            numero: function (s) { return /[0-9]/.test(s); },
+            simbolo: function (s) { return /[^A-Za-z0-9]/.test(s); }
+        };
+
+        // 14 caracteres com pelo menos um de cada tipo; sem 0/O/1/l/I, que confundem ao ditar.
+        function gerar() {
+            var tipos = ['ABCDEFGHJKLMNPQRSTUVWXYZ', 'abcdefghijkmnopqrstuvwxyz', '23456789', '!@#$%&*-_.'];
+            var todos = tipos.join(''), n = new Uint32Array(28), saida = [];
+            crypto.getRandomValues(n);
+            tipos.forEach(function (t, i) { saida.push(t[n[i] % t.length]); });
+            for (var i = 4; i < 14; i++) saida.push(todos[n[i] % todos.length]);
+            for (var j = saida.length - 1; j > 0; j--) {
+                var k = n[14 + j] % (j + 1), tmp = saida[j]; saida[j] = saida[k]; saida[k] = tmp;
+            }
+            return saida.join('');
+        }
+
+        document.querySelectorAll('[data-senha]').forEach(function (bloco) {
+            var form = bloco.closest('form');
+            var senha = bloco.querySelector('.entrada-senha'), conf = bloco.querySelector('.confirmar-senha');
+            var confere = bloco.querySelector('.confere-senha'), mostrar = bloco.querySelector('.senha-mostrar');
+            var opcional = bloco.hasAttribute('data-opcional');
+            // Botões de enviar dentro do form ou fora dele (form="id", nas janelas).
+            var botoes = Array.prototype.slice.call(form.querySelectorAll('button[type=submit]'));
+            if (form.id) botoes = botoes.concat(Array.prototype.slice.call(document.querySelectorAll('button[form="' + form.id + '"]')));
+
+            function valida() {
+                var s = senha.value, todas = true;
+                Object.keys(REGRAS).forEach(function (r) {
+                    var ok = REGRAS[r](s);
+                    bloco.querySelector('[data-regra="' + r + '"]').classList.toggle('ok', ok);
+                    if (!ok) todas = false;
+                });
+                var vazio = !s && !conf.value;
+                if (vazio) { confere.textContent = opcional ? 'Senha atual mantida.' : ''; confere.className = 'confere-senha'; }
+                else if (conf.value && conf.value === s) { confere.textContent = 'As senhas conferem.'; confere.className = 'confere-senha ok'; }
+                else if (conf.value) { confere.textContent = 'A confirmação está diferente.'; confere.className = 'confere-senha erro'; }
+                else { confere.textContent = 'Repita a senha para confirmar.'; confere.className = 'confere-senha'; }
+                var pode = (opcional && vazio) || (todas && conf.value === s);
+                botoes.forEach(function (b) { b.disabled = !pode; });
+                return pode;
+            }
+            mostrar.addEventListener('click', function () {
+                var ver = senha.type === 'password';
+                senha.type = conf.type = ver ? 'text' : 'password';
+                mostrar.textContent = ver ? 'Ocultar' : 'Mostrar';
+            });
+            var botaoGerar = bloco.querySelector('.senha-gerar');
+            if (botaoGerar) botaoGerar.addEventListener('click', function () {
+                senha.value = conf.value = gerar();
+                senha.type = conf.type = 'text';
+                mostrar.textContent = 'Ocultar';
+                valida();
+                senha.select();
+            });
+            senha.addEventListener('input', valida);
+            conf.addEventListener('input', valida);
+            form.addEventListener('reset', function () { setTimeout(valida, 0); });
+            form.addEventListener('submit', function (ev) { if (!valida()) ev.preventDefault(); });
+            bloco.validarSenha = valida;
+            valida();
+        });
+    })();
+</script>
+{% endmacro %}

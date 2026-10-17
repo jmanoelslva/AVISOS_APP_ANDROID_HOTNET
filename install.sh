@@ -58,7 +58,7 @@ done
 
 validar_senha() {
     local senha="$1"
-    [[ ${#senha} -ge 8 ]] || return 1
+    [[ ${#senha} -ge 8 && ${#senha} -le 128 ]] || return 1
     [[ "$senha" =~ [A-Z] ]] || return 1
     [[ "$senha" =~ [a-z] ]] || return 1
     [[ "$senha" =~ [0-9] ]] || return 1
@@ -67,7 +67,9 @@ validar_senha() {
 }
 
 while true; do
-    read -rsp "Senha (mín. 8 caracteres, com maiúscula, minúscula, número e caractere especial): " ADMIN_PASS
+    echo "Senha: 8 a 128 caracteres, com uma letra maiúscula (A-Z), uma minúscula (a-z),"
+    echo "um número (0-9) e um símbolo (ex.: ! @ # \$ % & * - _ .)."
+    read -rsp "Senha: " ADMIN_PASS
     echo
     read -rsp "Confirme a senha: " ADMIN_PASS_CONFIRM
     echo
@@ -84,6 +86,18 @@ done
 
 read -rp "Porta do painel web [8765]: " ADMIN_PORT
 ADMIN_PORT="${ADMIN_PORT:-8765}"
+
+echo ""
+echo "Domínio (opcional). Com domínio, o painel fica em https://SEU_DOMINIO, com"
+echo "certificado Let's Encrypt emitido e renovado automaticamente, e a porta acima"
+echo "passa a ser só interna. O domínio precisa já apontar (A/AAAA) para este"
+echo "servidor, com as portas 80 e 443 liberadas. Sem domínio: http://IP:PORTA."
+read -rp "Domínio do painel (Enter para usar só o IP): " DOMINIO
+DOMINIO="${DOMINIO,,}"
+EMAIL_LE=""
+if [[ -n "$DOMINIO" ]]; then
+    read -rp "E-mail para avisos do Let's Encrypt (recomendado; Enter para pular): " EMAIL_LE
+fi
 
 echo "== Gravando configuração inicial =="
 "$INSTALL_DIR/venv/bin/python" - "$INSTALL_DIR" "$ADMIN_USER" "$ADMIN_PASS" "$ADMIN_PORT" <<'PYEOF'
@@ -116,6 +130,20 @@ cp "$SCRIPT_DIR/aviso-broadcaster.service" /etc/systemd/system/
 systemctl daemon-reload
 systemctl enable aviso-broadcaster
 systemctl restart aviso-broadcaster
+
+DOMINIO_OK=0
+if [[ -n "$DOMINIO" ]]; then
+    echo "== Domínio e HTTPS (Let's Encrypt) =="
+    if INSTALL_DIR="$INSTALL_DIR" "$SCRIPT_DIR/configurar-dominio.sh" "$DOMINIO" ${EMAIL_LE:+"$EMAIL_LE"}; then
+        DOMINIO_OK=1
+    else
+        echo ""
+        echo "AVISO: não foi possível configurar $DOMINIO (veja o erro acima)."
+        echo "O painel continua acessível por IP e porta. Depois de corrigir"
+        echo "(DNS, portas 80/443), rode:"
+        echo "  cd $SCRIPT_DIR && ./configurar-dominio.sh $DOMINIO $EMAIL_LE"
+    fi
+fi
 
 echo ""
 echo "== Poller de eventos por conta (pagamento confirmado, chamado"
@@ -183,7 +211,11 @@ IP_LOCAL="$(hostname -I 2>/dev/null | awk '{print $1}')"
 echo ""
 echo "=================================================="
 echo "Instalação concluída!"
-echo "Painel disponível em: http://${IP_LOCAL:-SEU_SERVIDOR}:$ADMIN_PORT"
+if [[ "$DOMINIO_OK" -eq 1 ]]; then
+    echo "Painel disponível em: https://$DOMINIO (certificado com renovação automática)"
+else
+    echo "Painel disponível em: http://${IP_LOCAL:-SEU_SERVIDOR}:$ADMIN_PORT"
+fi
 echo "Usuário: $ADMIN_USER"
 if [[ "$POLLER_INSTALADO" -eq 1 ]]; then
     echo "Poller de eventos por conta: ativo (controllr-poller.timer)."
@@ -193,7 +225,8 @@ echo "IMPORTANTE:"
 echo "  1. Configure a lista de IPs permitidos em Configurações assim"
 echo "     que acessar (por padrão, sem essa lista, qualquer IP acessa"
 echo "     a tela de login)."
-echo "  2. Esse painel roda em HTTP simples — recomendado colocar um"
-echo "     Nginx com Let's Encrypt (certbot) na frente se for acessível"
-echo "     pela internet."
+if [[ "$DOMINIO_OK" -ne 1 ]]; then
+    echo "  2. Sem domínio, o painel roda em HTTP simples. Se for acessível"
+    echo "     pela internet, ative HTTPS: ./configurar-dominio.sh SEU_DOMINIO EMAIL"
+fi
 echo "=================================================="

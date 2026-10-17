@@ -19,7 +19,10 @@ except (OSError, ValueError):
 # padrão net.ipv6.bindv6only=0 (caso do Debian) — é uma única escuta
 # dual-stack. Tentar escutar em "0.0.0.0" E "[::]" ao mesmo tempo dá erro
 # de "endereço já em uso", por isso é só esse.
-bind = f"[::]:{_cfg.get('port', config_store.DEFAULT_PORT)}"
+_porta = _cfg.get("port", config_store.DEFAULT_PORT)
+# Com domínio (configurar-dominio.sh), só o Nginx/Apache local fala com o painel:
+# escuta apenas em 127.0.0.1, e o acesso de fora é só por HTTPS.
+bind = f"127.0.0.1:{_porta}" if _cfg.get("dominio") else f"[::]:{_porta}"
 
 # Só 1 worker de propósito: o bloqueio por tentativas de login errado
 # (_tentativas_login, em app.py) é guardado em memória do processo — com

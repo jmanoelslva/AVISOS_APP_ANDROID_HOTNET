@@ -31,6 +31,9 @@ csrf = CSRFProtect(app)
 # defina AVISO_BROADCASTER_HTTPS=1 no serviço systemd (ver README) pra
 # marcar o cookie como Secure.
 app.config["SESSION_COOKIE_SECURE"] = os.environ.get("AVISO_BROADCASTER_HTTPS") == "1"
+# Atrás do Nginx/Apache local (configurar-dominio.sh): o IP real do cliente vem no
+# X-Forwarded-For. Sem proxy, esse cabeçalho é do próprio navegador e é ignorado.
+_ATRAS_DE_PROXY = os.environ.get("AVISO_BROADCASTER_PROXY") == "1"
 
 
 @app.errorhandler(CSRFError)
@@ -48,10 +51,15 @@ _BLOQUEIO_SEGUNDOS = 300
 
 
 def _ip_do_cliente() -> str:
-    # Se estiver atrás de um proxy reverso (Nginx), confia no
-    # X-Forwarded-For; senão usa o IP direto da conexão.
+    # X-Forwarded-For só vale quando o pedido veio do proxy local configurado
+    # (AVISO_BROADCASTER_PROXY=1 e conexão de 127.0.0.1/::1). Antes era aceito
+    # sempre, e qualquer um podia mandar um IP liberado nesse cabeçalho e passar
+    # pela lista de IPs permitidos. Usa o último item: é o que o proxy acrescenta;
+    # os anteriores podem ter vindo do navegador.
+    bruto = request.remote_addr or ""
     encaminhado = request.headers.get("X-Forwarded-For")
-    bruto = encaminhado.split(",")[0].strip() if encaminhado else (request.remote_addr or "")
+    if _ATRAS_DE_PROXY and encaminhado and bruto in ("127.0.0.1", "::1", "::ffff:127.0.0.1"):
+        bruto = encaminhado.split(",")[-1].strip()
 
     # O servidor escuta em "[::]" (dual-stack IPv6+IPv4) — clientes IPv4
     # chegam como um endereço "IPv4-mapped" (ex: "::ffff:203.0.113.5").
@@ -96,7 +104,8 @@ def login_obrigatorio(f):
             return redirect(url_for("login"))
         # Usuário removido ou bloqueado perde a sessão já aberta no próximo clique.
         entrada = _entrada_usuario_logado(config_store.carregar())
-        if not entrada or not entrada.get("ativo", True):
+        if (not entrada or not entrada.get("ativo", True)
+                or session.get("sessao", 0) != entrada.get("sessao", 0)):
             session.clear()
             flash("Seu acesso ao painel foi encerrado. Fale com o administrador.", "erro")
             return redirect(url_for("login"))
@@ -229,6 +238,7 @@ def login():
             session.clear()
             session["autenticado"] = True
             session["usuario"] = usuario
+            session["sessao"] = entrada.get("sessao", 0)
             _tentativas_login.pop(ip, None)
             access_log.registrar("login_sucesso", usuario=usuario, ip=ip)
             return redirect(_pagina_inicial(permissoes.do_usuario(cfg, entrada)))
@@ -470,6 +480,9 @@ def minha_senha():
                 flash("Não atende aos requisitos: " + ", ".join(problemas), "erro")
             else:
                 entrada_logada["password_hash"] = generate_password_hash(nova)
+                # Encerra as outras sessões deste usuário; esta continua.
+                entrada_logada["sessao"] = entrada_logada.get("sessao", 0) + 1
+                session["sessao"] = entrada_logada["sessao"]
                 config_store.salvar(cfg)
                 access_log.registrar("senha_alterada", usuario=usuario_logado, ip=_ip_do_cliente())
                 flash("Senha atualizada com sucesso.", "sucesso")
@@ -479,7 +492,7 @@ def minha_senha():
 
 
 _ACOES_USUARIOS = {
-    "novo_usuario", "remover_usuario", "alterar_grupo", "alternar_bloqueio",
+    "novo_usuario", "editar_usuario", "remover_usuario",
     "salvar_grupos", "novo_grupo", "excluir_grupo",
 }
 _ACOES_REDE = {"porta", "acl"}
@@ -505,10 +518,6 @@ def _acao_usuarios(cfg: dict, acao: str, usuario_logado: str, entrada_logada: di
         access_log.registrar(evento, usuario=usuario_logado, ip=ip, detalhes=detalhes)
 
     if acao == "novo_usuario":
-        senha_confirmacao = request.form.get("senha_atual_novo_usuario", "")
-        if not check_password_hash(entrada_logada["password_hash"], senha_confirmacao):
-            flash("Sua senha atual está incorreta — confirmação necessária pra criar um novo usuário.", "erro")
-            return
         novo_nome = request.form.get("novo_usuario_nome", "").strip()
         nova_senha = request.form.get("novo_usuario_senha", "")
         nova_confirmacao = request.form.get("novo_usuario_confirmacao", "")
@@ -516,6 +525,8 @@ def _acao_usuarios(cfg: dict, acao: str, usuario_logado: str, entrada_logada: di
         problemas = validar_forca_senha(nova_senha)
         if not novo_nome:
             problemas.append("informe um nome de usuário")
+        elif len(novo_nome) > 60:
+            problemas.append("nome de usuário com até 60 caracteres")
         elif _achar_usuario(cfg, novo_nome):
             problemas.append("esse nome de usuário já existe")
         if nova_senha != nova_confirmacao:
@@ -523,7 +534,7 @@ def _acao_usuarios(cfg: dict, acao: str, usuario_logado: str, entrada_logada: di
         if not _grupo_existe(cfg, grupo):
             problemas.append("escolha um grupo")
         if problemas:
-            flash("Não atende aos requisitos: " + ", ".join(problemas), "erro")
+            flash("Usuário não criado: " + ", ".join(problemas) + ".", "erro")
             return
         cfg.setdefault("usuarios", []).append({
             "username": novo_nome,
@@ -531,20 +542,21 @@ def _acao_usuarios(cfg: dict, acao: str, usuario_logado: str, entrada_logada: di
             "grupo": grupo,
             "is_admin": grupo == permissoes.GRUPO_ADMIN,
             "ativo": True,
+            "sessao": 0,
         })
         config_store.salvar(cfg)
         registrar("usuario_criado", f"{novo_nome} ({grupo})")
         flash(f"Usuário \"{novo_nome}\" criado no grupo {grupo}.", "sucesso")
         return
 
-    if acao in ("remover_usuario", "alterar_grupo", "alternar_bloqueio"):
+    if acao in ("remover_usuario", "editar_usuario"):
         alvo = request.form.get("usuario", "")
         entrada_alvo = _achar_usuario(cfg, alvo)
         if not entrada_alvo:
             flash("Usuário não encontrado.", "erro")
             return
         if alvo == usuario_logado:
-            flash("Você não pode remover, bloquear nem trocar o grupo do seu próprio usuário.", "erro")
+            flash("Seu próprio usuário não se edita por aqui: a senha muda em Minha senha.", "erro")
             return
 
         if acao == "remover_usuario":
@@ -555,36 +567,47 @@ def _acao_usuarios(cfg: dict, acao: str, usuario_logado: str, entrada_logada: di
             config_store.salvar(cfg)
             registrar("usuario_removido", alvo)
             flash(f"Usuário \"{alvo}\" removido.", "sucesso")
+            return
 
-        elif acao == "alterar_grupo":
-            novo = request.form.get("grupo", "")
-            antigo = entrada_alvo.get("grupo")
-            if not _grupo_existe(cfg, novo):
-                flash("Grupo não encontrado.", "erro")
-            elif novo == antigo:
-                return
-            elif _ultimo_admin(cfg, entrada_alvo):
-                flash("Esse é o único administrador ativo. Coloque outro usuário no grupo Administrador antes.", "erro")
-            else:
-                entrada_alvo["grupo"] = novo
-                entrada_alvo["is_admin"] = novo == permissoes.GRUPO_ADMIN
-                config_store.salvar(cfg)
-                registrar("usuario_grupo_alterado", f"{alvo}: {antigo} → {novo}")
-                flash(f"\"{alvo}\" agora está no grupo {novo}. Vale a partir do próximo clique dele.", "sucesso")
+        # editar_usuario: grupo, situação e (opcional) nova senha, numa só gravação.
+        grupo = request.form.get("grupo", "")
+        ativo = request.form.get("ativo") == "1"
+        nova_senha = request.form.get("nova_senha", "")
+        confirmacao = request.form.get("confirmacao", "")
+        problemas = []
+        if not _grupo_existe(cfg, grupo):
+            problemas.append("grupo não encontrado")
+        if nova_senha or confirmacao:
+            problemas += validar_forca_senha(nova_senha)
+            if nova_senha != confirmacao:
+                problemas.append("as senhas não coincidem")
+        sai_do_admin = grupo != permissoes.GRUPO_ADMIN or not ativo
+        if not problemas and sai_do_admin and _ultimo_admin(cfg, entrada_alvo):
+            problemas.append("é o único administrador ativo; coloque outro no grupo Administrador antes")
+        if problemas:
+            flash(f"\"{alvo}\" não foi alterado: " + ", ".join(problemas) + ".", "erro")
+            return
 
-        else:  # alternar_bloqueio
-            if entrada_alvo.get("ativo", True):
-                if _ultimo_admin(cfg, entrada_alvo):
-                    flash("Esse é o único administrador ativo e não pode ser bloqueado.", "erro")
-                    return
-                entrada_alvo["ativo"] = False
-                registrar("usuario_bloqueado", alvo)
-                flash(f"\"{alvo}\" bloqueado. A sessão dele, se aberta, cai no próximo clique.", "sucesso")
-            else:
-                entrada_alvo["ativo"] = True
-                registrar("usuario_desbloqueado", alvo)
-                flash(f"\"{alvo}\" desbloqueado.", "sucesso")
-            config_store.salvar(cfg)
+        mudancas = []
+        if grupo != entrada_alvo.get("grupo"):
+            mudancas.append(f"grupo {entrada_alvo.get('grupo')} → {grupo}")
+            entrada_alvo["grupo"] = grupo
+            entrada_alvo["is_admin"] = grupo == permissoes.GRUPO_ADMIN
+        if ativo != entrada_alvo.get("ativo", True):
+            mudancas.append("desbloqueado" if ativo else "bloqueado")
+            entrada_alvo["ativo"] = ativo
+        if nova_senha:
+            mudancas.append("senha redefinida")
+            entrada_alvo["password_hash"] = generate_password_hash(nova_senha)
+            # Derruba as sessões abertas: entra de novo com a senha nova.
+            entrada_alvo["sessao"] = entrada_alvo.get("sessao", 0) + 1
+        if not mudancas:
+            flash(f"Nada mudou em \"{alvo}\".", "sucesso")
+            return
+        config_store.salvar(cfg)
+        registrar("usuario_editado", f"{alvo}: " + ", ".join(mudancas))
+        aviso = " A sessão dele, se aberta, foi encerrada." if nova_senha or not ativo else ""
+        flash(f"\"{alvo}\" atualizado: " + ", ".join(mudancas) + "." + aviso, "sucesso")
         return
 
     grupos = cfg.setdefault("grupos", [])
@@ -669,7 +692,11 @@ def configuracoes():
             except ValueError:
                 nova_porta = 0
             porta_atual = cfg.get("port", config_store.DEFAULT_PORT)
-            if not (PORTA_MIN <= nova_porta <= 65535):
+            if cfg.get("dominio"):
+                # A porta é interna (só o proxy local usa); trocar aqui quebraria o proxy.
+                flash(f"O painel está em https://{cfg['dominio']}; a porta interna não muda por aqui. "
+                      "Use ./configurar-dominio.sh no servidor.", "erro")
+            elif not (PORTA_MIN <= nova_porta <= 65535):
                 # Abaixo de 1024 o serviço (sem root) não consegue escutar e ficaria fora do ar.
                 flash(f"Porta inválida: use um número entre {PORTA_MIN} e 65535.", "erro")
             elif nova_porta == porta_atual:
@@ -739,6 +766,7 @@ def configuracoes():
         grupo_admin=permissoes.GRUPO_ADMIN,
         grupo_padrao=permissoes.GRUPO_PADRAO,
         porta_atual=cfg.get("port", config_store.DEFAULT_PORT),
+        dominio=cfg.get("dominio", ""),
         allowed_ips="\n".join(cfg.get("allowed_ips") or []),
     )
 

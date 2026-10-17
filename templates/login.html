@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% import "_senha.html" as senha %}
 {% block titulo %}Entrar · Avisos HOTNET{% endblock %}
 {% block conteudo %}
 <div class="card">
@@ -6,16 +7,15 @@
         <h2>Defina o primeiro usuário do painel</h2>
         <p class="dica">
             Primeiro acesso: crie o usuário administrador do painel. Outros usuários
-            podem ser adicionados depois em Ajustes. Senha com mínimo 8 caracteres,
-            maiúscula, minúscula, número e caractere especial.
+            podem ser adicionados depois em Ajustes.
         </p>
         <form method="post" action="{{ url_for('definir_senha_inicial') }}">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
             <div><label class="rotulo" for="usuario">Usuário</label><input type="text" id="usuario" name="usuario" required autofocus autocomplete="username"></div>
-            <div><label class="rotulo" for="senha">Senha</label><input type="password" id="senha" name="senha" required minlength="8" autocomplete="new-password"></div>
-            <div><label class="rotulo" for="confirmacao">Confirmar senha</label><input type="password" id="confirmacao" name="confirmacao" required minlength="8" autocomplete="new-password"></div>
+            {{ senha.campo("inicial", "senha", "confirmacao", gerar=False) }}
             <button type="submit">Definir usuário e senha</button>
         </form>
+        {{ senha.script() }}
     {% else %}
         <h2>Entrar</h2>
         <p class="dica">Painel de avisos da HOTNET.</p>

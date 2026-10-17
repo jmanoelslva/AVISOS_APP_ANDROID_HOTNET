@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% import "_senha.html" as senha %}
 {% block titulo %}Ajustes · Avisos HOTNET{% endblock %}
 {% block estilo %}
         /* Usuários e Acesso e rede lado a lado, da mesma altura; Grupos na largura toda, embaixo. */
@@ -58,30 +59,12 @@
                 {% set e_voce = u.username == usuario_atual %}
                 <tr class="{{ '' if u.ativo else 'bloqueado' }}">
                     <td><span class="nome"><span class="avatar-usuario">{{ u.username[0]|upper }}</span>{{ u.username }}{% if e_voce %} <span class="dica" style="margin:0">(você)</span>{% endif %}{% if not u.ativo %} <span class="etiqueta f">Bloqueado</span>{% endif %}</span></td>
-                    <td>
-                        {% if e_voce %}
-                        <span class="etiqueta {{ 's' if u.grupo == grupo_admin else 'p' }}">{{ u.grupo }}</span>
-                        {% else %}
-                        <form method="post">
-                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                            <input type="hidden" name="acao" value="alterar_grupo">
-                            <input type="hidden" name="usuario" value="{{ u.username }}">
-                            <select name="grupo" aria-label="Grupo de {{ u.username }}" data-envio-automatico>
-                                <option value="{{ grupo_admin }}" {{ 'selected' if u.grupo == grupo_admin }}>{{ grupo_admin }}</option>
-                                {% for g in grupos %}<option value="{{ g.nome }}" {{ 'selected' if u.grupo == g.nome }}>{{ g.nome }}</option>{% endfor %}
-                            </select>
-                            <noscript><button type="submit" class="botao-link">Salvar</button></noscript>
-                        </form>
-                        {% endif %}
-                    </td>
+                    <td><span class="etiqueta {{ 's' if u.grupo == grupo_admin else 'p' }}">{{ u.grupo }}</span></td>
                     <td class="acao">
-                        {% if not e_voce %}
-                        <form method="post">
-                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                            <input type="hidden" name="acao" value="alternar_bloqueio">
-                            <input type="hidden" name="usuario" value="{{ u.username }}">
-                            <button type="submit" class="botao-link">{{ 'Bloquear' if u.ativo else 'Desbloquear' }}</button>
-                        </form>
+                        {% if e_voce %}
+                        <a class="botao-link discreto" href="{{ url_for('minha_senha') }}">Minha senha</a>
+                        {% else %}
+                        <button type="button" class="botao-link" data-editar="{{ u.username }}" data-grupo="{{ u.grupo }}" data-ativo="{{ '1' if u.ativo else '0' }}">Editar</button>
                         <form method="post" data-confirmar="Remover o usuário {{ u.username }}? O histórico dele continua guardado.">
                             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                             <input type="hidden" name="acao" value="remover_usuario">
@@ -95,13 +78,20 @@
                 </tbody>
             </table>
         </div>
-        <p class="dica rodape-card">Bloquear tira o acesso sem apagar o histórico. Trocar o grupo vale no próximo clique do usuário, sem novo login.</p>
+        <p class="dica rodape-card">Em Editar: grupo, bloqueio e nova senha. Mudanças valem no próximo clique do usuário; trocar a senha ou bloquear encerra a sessão dele.</p>
     </section>
 {% endif %}
 {% if 'rede' in pode %}
     <section class="card" id="acesso">
         <div class="card-titulo"><h2>Acesso e rede</h2></div>
         <div>
+            {% if dominio %}
+            <div class="ajuste">
+                <b>Endereço</b><small>HTTPS com certificado Let's Encrypt, renovado automaticamente</small>
+                <p style="margin:0"><a href="https://{{ dominio }}">https://{{ dominio }}</a> <span class="etiqueta s">HTTPS</span></p>
+                <p class="dica" style="margin:0">Porta interna {{ porta_atual }}, só para o servidor web local. Para mudar o domínio ou voltar ao acesso por IP, use <code>./configurar-dominio.sh</code> no servidor.</p>
+            </div>
+            {% else %}
             <div class="ajuste">
                 <b>Porta</b><small>Ao salvar, o painel reabre sozinho na porta nova</small>
                 <form method="post" id="formPorta">
@@ -114,6 +104,7 @@
                     <p class="dica" style="margin:0">Entre 1024 e 65535. Libere a porta nova no firewall antes de trocar.</p>
                 </form>
             </div>
+            {% endif %}
             <div class="ajuste">
                 <b>IPs permitidos</b><small>Um por linha. IPv4 ou IPv6, com ou sem faixa (ex.: 203.0.113.0/24, 2001:db8::/32)</small>
                 <form method="post">
@@ -212,14 +203,38 @@
                 <option value="{{ grupo_admin }}" {{ 'selected' if not grupos }}>{{ grupo_admin }} (todas as permissões)</option>
             </select>
         </div>
-        <div><label class="rotulo" for="novaSenha">Senha</label><input type="password" id="novaSenha" name="novo_usuario_senha" required minlength="8" autocomplete="new-password"></div>
-        <div><label class="rotulo" for="novaConfirmacao">Confirmar senha</label><input type="password" id="novaConfirmacao" name="novo_usuario_confirmacao" required minlength="8" autocomplete="new-password"></div>
-        <p class="dica" style="margin:0">Mínimo 8 caracteres, com maiúscula, minúscula, número e caractere especial.</p>
-        <div><label class="rotulo" for="minhaSenha">Sua senha (confirmação)</label><input type="password" id="minhaSenha" name="senha_atual_novo_usuario" required autocomplete="current-password"></div>
+        {{ senha.campo("novo", "novo_usuario_senha", "novo_usuario_confirmacao") }}
     </form>
     <div class="acoes-dialogo">
         <button type="button" class="botao-secundario" id="cancelarNovoUsuario">Cancelar</button>
         <button type="submit" form="formNovoUsuario">Criar usuário</button>
+    </div>
+</dialog>
+
+<dialog class="janela" id="janelaEditar" aria-labelledby="tituloEditar">
+    <h2 id="tituloEditar">Editar <span id="editarNome"></span></h2>
+    <form method="post" class="formulario" id="formEditar">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <input type="hidden" name="acao" value="editar_usuario">
+        <input type="hidden" name="usuario" id="editarUsuario">
+        <div><label class="rotulo" for="editarGrupo">Grupo</label>
+            <select id="editarGrupo" name="grupo" required>
+                {% for g in grupos %}<option value="{{ g.nome }}">{{ g.nome }}</option>{% endfor %}
+                <option value="{{ grupo_admin }}">{{ grupo_admin }} (todas as permissões)</option>
+            </select>
+        </div>
+        <div><span class="rotulo">Situação</span>
+            <div class="segmentado" role="radiogroup" aria-label="Situação">
+                <label><input type="radio" name="ativo" value="1" id="editarAtivo">Ativo</label>
+                <label><input type="radio" name="ativo" value="0" id="editarBloqueado">Bloqueado</label>
+            </div>
+        </div>
+        {{ senha.campo("editar", "nova_senha", "confirmacao", rotulo="Nova senha", opcional=True) }}
+        <p class="dica" style="margin:0">Trocar a senha ou bloquear encerra a sessão aberta desse usuário.</p>
+    </form>
+    <div class="acoes-dialogo">
+        <button type="button" class="botao-secundario" id="cancelarEditar">Cancelar</button>
+        <button type="submit" form="formEditar">Salvar alterações</button>
     </div>
 </dialog>
 
@@ -261,10 +276,19 @@
         ligarJanela(document.getElementById('botaoNovoGrupo'), document.getElementById('janelaGrupo'),
             document.getElementById('cancelarNovoGrupo'), document.getElementById('formNovoGrupo'), document.getElementById('nomeGrupo'));
 
-        // Trocar o grupo na lista salva na hora.
-        document.querySelectorAll('[data-envio-automatico]').forEach(function (s) {
-            s.addEventListener('change', function () { s.form.submit(); });
+        var janelaEditar = document.getElementById('janelaEditar'), formEditar = document.getElementById('formEditar');
+        document.querySelectorAll('[data-editar]').forEach(function (b) {
+            b.addEventListener('click', function () {
+                formEditar.reset();
+                document.getElementById('editarNome').textContent = b.dataset.editar;
+                document.getElementById('editarUsuario').value = b.dataset.editar;
+                document.getElementById('editarGrupo').value = b.dataset.grupo;
+                document.getElementById(b.dataset.ativo === '1' ? 'editarAtivo' : 'editarBloqueado').checked = true;
+                formEditar.querySelector('[data-senha]').validarSenha();
+                abrir(janelaEditar, document.getElementById('editarGrupo'));
+            });
         });
+        if (formEditar) document.getElementById('cancelarEditar').addEventListener('click', function () { janelaEditar.close(); });
         // Remover usuário e excluir grupo pedem confirmação.
         document.querySelectorAll('form[data-confirmar]').forEach(function (f) {
             f.addEventListener('submit', function (ev) { if (!confirm(f.dataset.confirmar)) ev.preventDefault(); });
@@ -303,4 +327,5 @@
         }
     })();
 </script>
+{% if 'usuarios' in pode %}{{ senha.script() }}{% endif %}
 {% endblock %}

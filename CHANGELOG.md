@@ -11,6 +11,30 @@ systemctl restart aviso-broadcaster
 ```
 O poller roda por timer e usa o código novo no ciclo seguinte, sem reinício.
 
+## [1.6.0] - 2026-10-16
+Partes: painel e instalador.
+
+### Adicionado
+- `configurar-dominio.sh`: painel em `https://DOMINIO` com certificado Let's Encrypt e renovação automática (`certbot.timer`, testada com `--dry-run`).
+  - Usa o Apache se estiver ativo; senão instala o Nginx.
+  - Confere o DNS; libera 80/443 no `ufw` se ativo.
+  - Remove o site se o certificado falhar.
+  - `--remover` volta ao acesso por IP e porta.
+- `install.sh` pergunta o domínio (opcional) e o e-mail do Let's Encrypt; sem domínio, acesso por `http://IP:PORTA`.
+- Ajustes → Usuários → Editar: grupo, situação e nova senha (opcional) numa janela.
+- Campo de senha com as regras marcadas enquanto se digita, Mostrar e Gerar (14 caracteres), no cadastro, na edição, em Minha senha e no primeiro acesso.
+- Evento `usuario_editado` no Histórico (sem a senha).
+
+### Alterado
+- Novo usuário e edição não pedem mais a senha do administrador.
+- Com domínio: Gunicorn escuta só em `127.0.0.1`; Ajustes mostra o endereço HTTPS e não troca a porta.
+- Senha: máximo de 128 caracteres (painel e `install.sh`).
+- Lista de usuários só para leitura; grupo e bloqueio saíram da linha e foram para Editar.
+
+### Segurança
+- Lista de IPs permitidos podia ser contornada com um `X-Forwarded-For` forjado. O cabeçalho agora só é aceito com `AVISO_BROADCASTER_PROXY=1` e de conexões locais, usando o último item.
+- Trocar a senha (por Editar ou Minha senha) encerra as outras sessões do usuário.
+
 ## [1.5.0] - 2026-10-16
 Partes: painel.
 
@@ -138,6 +162,7 @@ Partes: painel e poller. Estado em produção desde o piloto.
 - `invoice_valid=false` é pagamento manual no escritório, não cliente inativo.
 - Pagamento confirmado usa `invoice_amount_paid` em vez de `invoice_amount_document`.
 
+[1.6.0]: https://github.com/jmanoelslva/AVISOS_APP_ANDROID_HOTNET/compare/v1.5.0...v1.6.0
 [1.5.0]: https://github.com/jmanoelslva/AVISOS_APP_ANDROID_HOTNET/compare/v1.4.1...v1.5.0
 [1.4.1]: https://github.com/jmanoelslva/AVISOS_APP_ANDROID_HOTNET/compare/v1.4.0...v1.4.1
 [1.4.0]: https://github.com/jmanoelslva/AVISOS_APP_ANDROID_HOTNET/compare/v1.3.0...v1.4.0

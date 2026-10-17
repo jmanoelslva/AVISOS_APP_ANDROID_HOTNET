@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% import "_senha.html" as senha %}
 {% block titulo %}Minha senha · Avisos HOTNET{% endblock %}
 {% block conteudo %}
 <div class="cabecalho-pagina">
@@ -11,10 +12,10 @@
     <form method="post" class="formulario" style="margin-top:0">
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <div><label class="rotulo" for="senhaAtual">Senha atual</label><input type="password" id="senhaAtual" name="senha_atual" required autofocus autocomplete="current-password"></div>
-        <div><label class="rotulo" for="novaSenha">Nova senha</label><input type="password" id="novaSenha" name="nova_senha" required minlength="8" autocomplete="new-password"></div>
-        <div><label class="rotulo" for="confirmacao">Confirmar nova senha</label><input type="password" id="confirmacao" name="confirmacao" required minlength="8" autocomplete="new-password"></div>
-        <p class="dica" style="margin:0">Mínimo 8 caracteres, com maiúscula, minúscula, número e caractere especial.</p>
+        {{ senha.campo("minha", "nova_senha", "confirmacao", rotulo="Nova senha", gerar=False) }}
+        <p class="dica" style="margin:0">Ao salvar, suas outras sessões abertas (outro navegador ou computador) são encerradas.</p>
         <div><button type="submit">Salvar senha</button></div>
     </form>
 </div>
+{{ senha.script() }}
 {% endblock %}
