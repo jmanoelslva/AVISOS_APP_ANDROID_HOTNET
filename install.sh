@@ -147,7 +147,7 @@ fi
 
 echo ""
 echo "== Poller de eventos por conta (pagamento confirmado, chamado"
-echo "   atualizado, fatura atrasada) — opcional =="
+echo "   respondido, fatura atrasada, lembrete de vencimento) — opcional =="
 echo "Consulta o Controllr periodicamente (a cada 1 hora) como um usuário"
 echo "ADMIN dedicado, só leitura, numa porta diferente da área de cliente"
 echo "(8080/8081/8443, conforme configurado no seu Controllr). Não altera"
@@ -198,7 +198,7 @@ PYEOF
         echo "e rode manualmente depois:"
         echo "  chown -R $SERVICE_USER:$SERVICE_USER $INSTALL_DIR"
         echo "  su -s /bin/bash $SERVICE_USER -c 'cd $INSTALL_DIR && venv/bin/python poller.py'"
-        echo "Confirme \"baseline gravada\" na aba Logs do painel antes de instalar:"
+        echo "Confirme \"baseline gravada\" no Histórico do painel antes de instalar:"
         echo "  cp $SCRIPT_DIR/controllr-poller.service $SCRIPT_DIR/controllr-poller.timer /etc/systemd/system/"
         echo "  systemctl daemon-reload && systemctl enable --now controllr-poller.timer"
     fi
@@ -222,7 +222,7 @@ if [[ "$POLLER_INSTALADO" -eq 1 ]]; then
 fi
 echo ""
 echo "IMPORTANTE:"
-echo "  1. Configure a lista de IPs permitidos em Configurações assim"
+echo "  1. Configure a lista de IPs permitidos em Ajustes assim"
 echo "     que acessar (por padrão, sem essa lista, qualquer IP acessa"
 echo "     a tela de login)."
 if [[ "$DOMINIO_OK" -ne 1 ]]; then

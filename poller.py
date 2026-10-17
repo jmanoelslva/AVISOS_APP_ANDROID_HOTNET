@@ -258,6 +258,22 @@ def processar_vencimentos(faturas: list[dict], estado: dict, primeira_vez: bool,
     return notificadas
 
 
+def podar_estado(faturas: list[dict], estado: dict) -> None:
+    """Esquece faturas que saíram da janela consultada (vencimento de 90 dias atrás a
+    30 à frente). A janela só anda para a frente: o que sai não volta, e sem a poda
+    o poller_state.json crescia para sempre."""
+    atuais = {str(f.get("invoice_pk")) for f in faturas}
+    for categoria in ("faturas", "faturas_atrasadas", "faturas_vence_amanha"):
+        vistas = estado.get(categoria)
+        if isinstance(vistas, dict):
+            for pk in [pk for pk in vistas if pk not in atuais]:
+                del vistas[pk]
+    vence_em = estado.get("faturas_vence_em")
+    if isinstance(vence_em, dict):
+        for chave in [c for c in vence_em if c.split(":")[0] not in atuais]:
+            del vence_em[chave]
+
+
 def processar_chamados(cliente: ControllrClient, estado: dict, primeira_vez_chamados: bool) -> tuple[int, int]:
     chamados_vistos = estado.setdefault("chamados", {})
     chamados = cliente.buscar_chamados()
@@ -299,6 +315,11 @@ def processar_chamados(cliente: ControllrClient, estado: dict, primeira_vez_cham
 
         chamados_vistos[pk_str] = ultimo_atual
 
+    # Esquece chamados fora da janela de 7 dias. Se um deles voltar a ter atividade,
+    # volta com ticket_date_last novo, que é justamente o que deve gerar aviso.
+    atuais = {str(c.get("ticket_pk")) for c in chamados}
+    for pk in [pk for pk in chamados_vistos if pk not in atuais]:
+        del chamados_vistos[pk]
     return len(chamados), notificadas
 
 
@@ -339,10 +360,16 @@ def _ciclo() -> int:
     notif_pagamentos = processar_pagamentos(faturas, estado, primeira_vez_pagamentos)
     notif_atrasos = processar_atrasos(faturas, estado, primeira_vez_atrasos, no_horario, cfg_lembretes["atraso_ativo"])
     notif_vencimentos = processar_vencimentos(faturas, estado, primeira_vez_vence_amanha, cfg_lembretes, no_horario)
+    podar_estado(faturas, estado)
+    # Grava já: se os chamados falharem abaixo, os avisos de fatura que acabaram de
+    # sair não podem ser reenviados no próximo ciclo (antes eram).
+    state_store.salvar(estado)
 
     try:
         total_chamados, notif_chamados = processar_chamados(cliente, estado, primeira_vez_chamados)
     except Exception as e:
+        # Os chamados avisados antes da falha já estão marcados no estado: grava também.
+        state_store.salvar(estado)
         access_log.registrar("poller_falha", detalhes=f"busca de chamados: {e}")
         print(f"Falha ao consultar chamados: {e}", file=sys.stderr)
         return 1

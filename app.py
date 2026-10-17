@@ -25,12 +25,13 @@ app = Flask(__name__)
 app.secret_key = config_store.carregar()["secret_key"]
 csrf = CSRFProtect(app)
 
-# O painel roda atrás de um Apache fazendo proxy reverso. Por padrão o
-# cookie de sessão não exige HTTPS (senão logins quebrariam em instalações
-# só-HTTP numa rede interna). Se o Apache na frente já terminar TLS,
-# defina AVISO_BROADCASTER_HTTPS=1 no serviço systemd (ver README) pra
-# marcar o cookie como Secure.
-app.config["SESSION_COOKIE_SECURE"] = os.environ.get("AVISO_BROADCASTER_HTTPS") == "1"
+# Sem domínio, o painel é acessado por http://IP:PORTA e o cookie não pode exigir
+# HTTPS (o login pararia). Com domínio (configurar-dominio.sh), o serviço recebe
+# AVISO_BROADCASTER_HTTPS=1 e o cookie só viaja por HTTPS.
+_HTTPS = os.environ.get("AVISO_BROADCASTER_HTTPS") == "1"
+app.config["SESSION_COOKIE_SECURE"] = _HTTPS
+# Explícito: o cookie de sessão não vai em pedidos vindos de outros sites.
+app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
 # Atrás do Nginx/Apache local (configurar-dominio.sh): o IP real do cliente vem no
 # X-Forwarded-For. Sem proxy, esse cabeçalho é do próprio navegador e é ignorado.
 _ATRAS_DE_PROXY = os.environ.get("AVISO_BROADCASTER_PROXY") == "1"
@@ -39,15 +40,54 @@ _ATRAS_DE_PROXY = os.environ.get("AVISO_BROADCASTER_PROXY") == "1"
 @app.errorhandler(CSRFError)
 def csrf_invalido(e):
     flash("Sessão expirada ou formulário inválido — tente de novo.", "erro")
-    destino = request.referrer or url_for("login")
-    return redirect(destino)
+    # Volta para a própria tela do painel (antes ia para o Referer, que pode ser outro site).
+    if request.endpoint and request.endpoint not in ("definir_senha_inicial", "static"):
+        return redirect(url_for(request.endpoint))
+    return redirect(url_for("login"))
+
+
+@app.after_request
+def cabecalhos_de_seguranca(resposta):
+    # Nenhum site pode abrir o painel numa moldura (evita induzir um clique em
+    # "Enviar aviso" escondido atrás de outra página).
+    resposta.headers.setdefault("X-Frame-Options", "DENY")
+    resposta.headers.setdefault("Content-Security-Policy", "frame-ancestors 'none'")
+    resposta.headers.setdefault("X-Content-Type-Options", "nosniff")
+    resposta.headers.setdefault("Referrer-Policy", "same-origin")
+    if _HTTPS:
+        resposta.headers.setdefault("Strict-Transport-Security", "max-age=31536000")
+    return resposta
 
 # Bloqueio simples por IP após tentativas de senha erradas seguidas —
 # guardado em memória (reinicia se o serviço reiniciar, o que é aceitável
-# pra um painel de baixo tráfego como esse).
-_tentativas_login: dict[str, tuple[int, float]] = {}
+# pra um painel de baixo tráfego como esse). IP -> (erros, bloqueado até, último erro).
+_tentativas_login: dict[str, tuple[int, float, float]] = {}
+_trava_tentativas = threading.Lock()
 _MAX_TENTATIVAS = 5
 _BLOQUEIO_SEGUNDOS = 300
+
+
+def _bloqueado_ate(ip: str) -> float:
+    """Fim do bloqueio do IP (0 = livre). Bloqueio vencido ou erros antigos (mais de
+    5 min sem errar) zeram a contagem; antes, depois do primeiro bloqueio, cada erro
+    novo bloqueava de novo. Também descarta IPs parados, para o dicionário não crescer."""
+    agora = time.time()
+    with _trava_tentativas:
+        for outro, (_, ate, ultimo) in list(_tentativas_login.items()):
+            if ate <= agora and agora - ultimo > _BLOQUEIO_SEGUNDOS:
+                del _tentativas_login[outro]
+        return _tentativas_login.get(ip, (0, 0.0, 0.0))[1]
+
+
+def _registrar_erro_login(ip: str) -> None:
+    agora = time.time()
+    with _trava_tentativas:
+        contagem, _, _ = _tentativas_login.get(ip, (0, 0.0, 0.0))
+        contagem += 1
+        if contagem >= _MAX_TENTATIVAS:
+            _tentativas_login[ip] = (0, agora + _BLOQUEIO_SEGUNDOS, agora)
+        else:
+            _tentativas_login[ip] = (contagem, 0.0, agora)
 
 
 def _ip_do_cliente() -> str:
@@ -79,7 +119,7 @@ def checar_acl():
     cfg = config_store.carregar()
     permitidos = cfg.get("allowed_ips") or []
     if not permitidos:
-        return  # ACL vazia = sem restrição de IP (ver aviso na tela de configurações)
+        return  # lista vazia = sem restrição de IP (Ajustes mostra o aviso)
     ip_cliente = _ip_do_cliente()
     for faixa in permitidos:
         try:
@@ -165,7 +205,6 @@ def injetar_usuario_e_permissoes():
         status = painel_info.status_topo(access_log.listar(limite=access_log.MAX_LINHAS))
     return {
         "pode": perms,
-        "usuario_e_admin": bool(entrada and entrada.get("grupo") == permissoes.GRUPO_ADMIN),
         "pagina_inicial": _pagina_inicial(perms) if perms else url_for("login"),
         "emojis": painel_info.EMOJIS,
         "status_topo": status,
@@ -217,10 +256,9 @@ LIMITE_MENSAGEM = 500
 def login():
     cfg = config_store.carregar()
     ip = _ip_do_cliente()
-    _, bloqueado_ate = _tentativas_login.get(ip, (0, 0.0))
     primeira_vez = not cfg.get("usuarios")
 
-    if time.time() < bloqueado_ate:
+    if time.time() < _bloqueado_ate(ip):
         flash("Muitas tentativas erradas. Tente de novo em alguns minutos.", "erro")
         return render_template("login.html", primeira_vez=primeira_vez)
 
@@ -239,14 +277,12 @@ def login():
             session["autenticado"] = True
             session["usuario"] = usuario
             session["sessao"] = entrada.get("sessao", 0)
-            _tentativas_login.pop(ip, None)
+            with _trava_tentativas:
+                _tentativas_login.pop(ip, None)
             access_log.registrar("login_sucesso", usuario=usuario, ip=ip)
             return redirect(_pagina_inicial(permissoes.do_usuario(cfg, entrada)))
 
-        contagem, _ = _tentativas_login.get(ip, (0, 0.0))
-        contagem += 1
-        bloqueio = time.time() + _BLOQUEIO_SEGUNDOS if contagem >= _MAX_TENTATIVAS else 0.0
-        _tentativas_login[ip] = (contagem, bloqueio)
+        _registrar_erro_login(ip)
         access_log.registrar("login_falha", usuario=usuario, ip=ip)
         flash("Usuário ou senha incorretos.", "erro")
 
@@ -257,8 +293,7 @@ def login():
 def definir_senha_inicial():
     # Só é permitido enquanto nenhum usuário tiver sido criado ainda
     # (primeiro uso do painel, se não foi feito via install.sh). Depois
-    # disso, novos usuários só podem ser criados em Configurações, já
-    # logado.
+    # disso, novos usuários só podem ser criados em Ajustes, já logado.
     cfg = config_store.carregar()
     if cfg.get("usuarios"):
         abort(403)
@@ -324,7 +359,7 @@ def dashboard():
                 flash(
                     "Não foi possível enviar o aviso agora. Tente de novo em "
                     "instantes; se persistir, avise o administrador (o "
-                    "detalhe técnico ficou registrado em Logs).",
+                    "detalhe técnico ficou registrado no Histórico).",
                     "erro",
                 )
 
@@ -513,7 +548,7 @@ def _ultimo_admin(cfg: dict, entrada: dict) -> bool:
             and len(permissoes.admins_ativos(cfg)) <= 1)
 
 
-def _acao_usuarios(cfg: dict, acao: str, usuario_logado: str, entrada_logada: dict, ip: str) -> None:
+def _acao_usuarios(cfg: dict, acao: str, usuario_logado: str, ip: str) -> None:
     def registrar(evento: str, detalhes: str) -> None:
         access_log.registrar(evento, usuario=usuario_logado, ip=ip, detalhes=detalhes)
 
@@ -684,7 +719,7 @@ def configuracoes():
             return redirect(url_for("configuracoes"))
 
         if exigida == "usuarios":
-            _acao_usuarios(cfg, acao, usuario_logado, entrada_logada, ip)
+            _acao_usuarios(cfg, acao, usuario_logado, ip)
 
         elif acao == "porta":
             try:

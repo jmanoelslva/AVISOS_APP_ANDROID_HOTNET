@@ -16,7 +16,7 @@ def _inicializar():
             raise FileNotFoundError(
                 "service-account.json não encontrado. Gere em: Firebase Console > "
                 "Configurações do projeto > Contas de serviço > Gerar nova chave privada, "
-                "e salve como server/aviso-broadcaster/service-account.json."
+                "e salve como service-account.json na pasta do painel (/opt/aviso-broadcaster)."
             )
         cred = credentials.Certificate(str(_SERVICE_ACCOUNT_PATH))
         _app = firebase_admin.initialize_app(cred)

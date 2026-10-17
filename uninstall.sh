@@ -22,6 +22,7 @@ echo "  - o timer/serviço do poller (controllr-poller), se instalado"
 echo "  - a pasta $INSTALL_DIR (config.json, service-account.json e"
 echo "    controllr_config.json incluídos)"
 echo "  - o usuário de sistema $SERVICE_USER"
+echo "  - a configuração de domínio (Nginx/Apache), se houver"
 echo ""
 read -rp "Confirma a desinstalação completa? [s/N] " CONFIRMA
 if [[ ! "$CONFIRMA" =~ ^[sS]$ ]]; then
@@ -50,6 +51,22 @@ fi
 if [[ -f "$POLLER_SERVICE_FILE" || -f "$POLLER_TIMER_FILE" ]]; then
     echo "== Removendo unidades systemd do poller =="
     rm -f "$POLLER_SERVICE_FILE" "$POLLER_TIMER_FILE"
+    systemctl daemon-reload
+fi
+
+# Modo domínio (configurar-dominio.sh): site do Nginx/Apache e ajuste do serviço.
+# O certificado fica em /etc/letsencrypt (apague com: certbot delete).
+if [[ -d /etc/systemd/system/aviso-broadcaster.service.d || -e /etc/nginx/sites-available/aviso-broadcaster \
+      || -e /etc/apache2/sites-available/aviso-broadcaster.conf ]]; then
+    echo "== Removendo a configuração de domínio =="
+    rm -rf /etc/systemd/system/aviso-broadcaster.service.d
+    rm -f /etc/nginx/sites-enabled/aviso-broadcaster /etc/nginx/sites-available/aviso-broadcaster
+    if command -v a2dissite >/dev/null; then
+        a2dissite -q aviso-broadcaster aviso-broadcaster-le-ssl 2>/dev/null || true
+        rm -f /etc/apache2/sites-available/aviso-broadcaster.conf /etc/apache2/sites-available/aviso-broadcaster-le-ssl.conf
+    fi
+    systemctl reload nginx 2>/dev/null || true
+    systemctl reload apache2 2>/dev/null || true
     systemctl daemon-reload
 fi
 

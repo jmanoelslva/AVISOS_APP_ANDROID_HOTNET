@@ -11,6 +11,36 @@ systemctl restart aviso-broadcaster
 ```
 O poller roda por timer e usa o código novo no ciclo seguinte, sem reinício.
 
+## [1.6.2] - 2026-10-16
+Partes: painel, poller e scripts. Exige reinstalar dependências (Gunicorn 23).
+
+### Corrigido
+- Poller sem `poller_state.json` (instalação nova, arquivo apagado) notificava todo pagamento da janela de 90 dias. Agora a primeira execução só grava a baseline.
+- Falha na consulta de chamados reenviava, no ciclo seguinte, os avisos de fatura já enviados. O estado é gravado logo após as faturas.
+- `poller_state.json` gravado de uma vez (temporário + troca); queda no meio não corrompe mais o arquivo.
+- `poller_state.json` não cresce mais sem limite: faturas e chamados fora da janela são descartados.
+- Bloqueio de login: a contagem zera quando o bloqueio vence ou após 5 min sem erro (antes, cada erro depois do primeiro bloqueio bloqueava de novo); IPs parados saem da memória.
+- `acessos.log`: trava também entre processos (painel e poller).
+- Erro de CSRF volta para a própria tela do painel, não para o `Referer`.
+- `uninstall.sh` remove a configuração de domínio (site Nginx/Apache e ajuste do systemd).
+
+### Segurança
+- Cabeçalhos: `X-Frame-Options: DENY` e `frame-ancestors 'none'` (painel não abre em moldura de outro site), `X-Content-Type-Options: nosniff`, `Referrer-Policy: same-origin`; `Strict-Transport-Security` com domínio.
+- Cookie de sessão com `SameSite=Lax` explícito.
+- Gunicorn 23 (corrige CVE-2024-6827, request smuggling; relevante com proxy).
+
+### Removido
+- `usuario_e_admin` (sem uso nos templates) e parâmetro sem uso em `_acao_usuarios`.
+- Textos antigos: "Logs" e "Configurações" (agora Histórico e Ajustes), caminho `server/aviso-broadcaster/`, comentário sobre Apache, "piloto" no README, eventos do poller no `install.sh` e no `.service`, seção 8 do README.
+
+### Como atualizar o servidor
+```bash
+cd /opt/aviso-broadcaster && git pull
+venv/bin/pip install -r requirements.txt
+chown -R aviso-broadcaster: /opt/aviso-broadcaster
+systemctl restart aviso-broadcaster
+```
+
 ## [1.6.1] - 2026-10-16
 Partes: painel e poller (timer).
 
@@ -174,6 +204,7 @@ Partes: painel e poller. Estado em produção desde o piloto.
 - `invoice_valid=false` é pagamento manual no escritório, não cliente inativo.
 - Pagamento confirmado usa `invoice_amount_paid` em vez de `invoice_amount_document`.
 
+[1.6.2]: https://github.com/jmanoelslva/AVISOS_APP_ANDROID_HOTNET/compare/v1.6.1...v1.6.2
 [1.6.1]: https://github.com/jmanoelslva/AVISOS_APP_ANDROID_HOTNET/compare/v1.6.0...v1.6.1
 [1.6.0]: https://github.com/jmanoelslva/AVISOS_APP_ANDROID_HOTNET/compare/v1.5.0...v1.6.0
 [1.5.0]: https://github.com/jmanoelslva/AVISOS_APP_ANDROID_HOTNET/compare/v1.4.1...v1.5.0

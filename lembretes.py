@@ -1,4 +1,4 @@
-"""Configuração dos lembretes automáticos do poller, editada no painel (Configurações)
+"""Configuração dos lembretes automáticos do poller, editada no painel (aba Automáticos)
 e gravada em config.json na chave "lembretes":
 
 - dias_antes: com quantos dias de antecedência avisar o vencimento (1 = véspera, até 7;

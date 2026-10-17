@@ -1,6 +1,12 @@
 import json
 import threading
 import time
+from contextlib import contextmanager
+
+try:
+    import fcntl  # Linux (servidor); no Windows de desenvolvimento só vale a trava de thread
+except ImportError:
+    fcntl = None
 from pathlib import Path
 
 LOG_PATH = Path(__file__).resolve().parent / "acessos.log"
@@ -9,9 +15,25 @@ LOG_PATH = Path(__file__).resolve().parent / "acessos.log"
 # recentes.
 MAX_LINHAS = 1000
 
-# O painel roda com threads (gunicorn gthread): sem trava, duas gravações ao
-# mesmo tempo leriam o arquivo antigo e uma das linhas se perderia.
+# Sem trava, duas gravações ao mesmo tempo leriam o arquivo antigo e uma linha se
+# perderia: entre threads do painel (gunicorn gthread) e entre o painel e o poller,
+# que são processos diferentes (flock num arquivo de trava ao lado).
 _trava = threading.Lock()
+_ARQUIVO_TRAVA = LOG_PATH.with_name(".acessos.lock")
+
+
+@contextmanager
+def _travado():
+    with _trava:
+        if fcntl is None:
+            yield
+            return
+        with open(_ARQUIVO_TRAVA, "a") as trava:
+            fcntl.flock(trava, fcntl.LOCK_EX)
+            try:
+                yield
+            finally:
+                fcntl.flock(trava, fcntl.LOCK_UN)
 
 
 def registrar(evento: str, usuario: str = "", ip: str = "", detalhes: str = "", mensagem: str = "") -> None:
@@ -25,7 +47,7 @@ def registrar(evento: str, usuario: str = "", ip: str = "", detalhes: str = "", 
     # Texto do aviso enviado: "Últimos avisos" do painel oferece "Usar de novo".
     if mensagem:
         entrada["mensagem"] = mensagem
-    with _trava:
+    with _travado():
         linhas = []
         if LOG_PATH.exists():
             with open(LOG_PATH, "r", encoding="utf-8") as f:

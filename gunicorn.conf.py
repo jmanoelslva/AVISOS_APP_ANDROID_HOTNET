@@ -1,6 +1,6 @@
-"""Configuração do Gunicorn — lê a porta do mesmo config.json usado pelo
-painel, pra manter o fluxo de "trocar a porta em Configurações e reiniciar
-o serviço" funcionando igual ao antes.
+"""Configuração do Gunicorn — lê a porta (e o domínio, se houver) do mesmo
+config.json do painel. Trocar a porta em Ajustes manda SIGHUP ao master, que
+reexecuta este arquivo e passa a escutar na porta nova.
 """
 import json
 

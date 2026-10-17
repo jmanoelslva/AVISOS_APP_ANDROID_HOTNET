@@ -9,3 +9,5 @@ envios.log
 .config-*
 controllr_config.json
 poller_state.json
+.poller_state-*
+.acessos.lock

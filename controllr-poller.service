@@ -1,5 +1,5 @@
 [Unit]
-Description=Controllr Poller - HOTNET (confirmação de pagamento via FCM)
+Description=Controllr Poller - HOTNET (pagamento, atraso, lembrete de vencimento e chamado via FCM)
 After=network.target
 
 [Service]

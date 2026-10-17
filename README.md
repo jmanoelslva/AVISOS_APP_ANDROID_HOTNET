@@ -15,7 +15,7 @@ Este servidor precisa de credenciais de **administrador** do Firebase
    **Contas de serviço**.
 3. Clique em **Gerar nova chave privada** e confirme.
 4. Renomeie o arquivo baixado para `service-account.json` e coloque
-   nesta pasta (`server/aviso-broadcaster/service-account.json`).
+   na pasta do painel (`/opt/aviso-broadcaster/service-account.json` no servidor).
 
 Esse arquivo é secreto (dá acesso de admin ao projeto Firebase) —
 **nunca** o versione no git (já está no `.gitignore`).
@@ -282,31 +282,21 @@ sistema `aviso-broadcaster`.
 
 ## 8. Identidade visual
 
-O visual do painel foi alinhado ao do app HOTNET (`WEB_APPS/HOTNET_WEB_APP`):
-
+- **Cores:** topo grafite (`--cor-topo`, a mesma do app), laranja `#C94300` só em
+  ação e seleção, e as cores de estado (sucesso, alerta, erro, informação).
 - **Fonte:** Manrope, a mesma do app HOTNET, servida pelo próprio painel
   (`static/fonts`, WOFF2, licença SIL OFL 1.1). Não depende do Google Fonts.
-- **Cores de marca:** o laranja/vermelho do gradiente (`#F28F3B` →
-  `#D94A38`) já é o mesmo `--cor-primaria`/`--cor-primaria-escura` usado
-  lá — não precisou trocar.
-- **Tema claro/escuro:** segue a preferência do sistema operacional por
-  padrão, com um botão no cabeçalho (🌙/☀️) pra alternar manualmente —
-  a escolha fica salva no navegador (`localStorage`), mesmo padrão de
-  `src/utils/tema.ts` do web app. Paleta escura reaproveita os mesmos
-  tons de `src/index.css` (`#121316` fundo, `#1e2025` superfície, etc).
-- **Mostrar/ocultar senha:** todo campo de senha do painel ganha um
-  ícone de olho pra revelar o texto digitado (aplicado automaticamente
-  via JS em `base.html`, não precisa repetir por template).
-- **Microinterações:** fade-in leve ao carregar a página e um
-  "afundar" sutil (scale) ao clicar em botões, no mesmo espírito do
-  feedback de toque do web app; tudo respeita
-  `prefers-reduced-motion`.
+- **Logotipo:** `static/logo.png`, num selo branco no topo (o "H" cinza some no
+  fundo escuro sem ele). Também é o ícone da aba do navegador.
+- **Tema claro/escuro:** segue o sistema operacional, com o botão 🌙/☀️ no topo
+  para trocar; a escolha fica salva no navegador.
+- **Movimento:** transições curtas, desligadas com `prefers-reduced-motion`.
 
-Todo o CSS mora num único bloco `<style>` em `templates/base.html`,
-como variáveis (`--cor-*`, `--raio`, `--sombra`) no `:root` — é ali que
-se ajusta qualquer cor, raio de borda ou sombra do painel inteiro.
+Todo o CSS comum mora num único bloco `<style>` em `templates/base.html`, com
+as cores como variáveis (`--cor-*`, `--raio`, `--sombra`) no `:root`. Cada tela
+acrescenta o seu no bloco `estilo`.
 
-## 9. Poller de eventos por conta (piloto)
+## 9. Poller de eventos por conta
 
 Peça separada do painel web, sem interface própria ainda: consulta o
 Controllr periodicamente (como um admin, não como cliente) e manda push
@@ -456,7 +446,7 @@ estado de uma instância específica, `install.sh` cria os que precisar
 do zero. Um clone git novo (`git clone` direto do repo) nunca tem esses
 arquivos, então copiar a partir dele é sempre seguro.
 
-## 11. Como desativar o piloto de push por conta (registro de reversão)
+## 11. Como desativar o push por conta (registro de reversão)
 
 **Atualizado 2026-09-05 — leia isto antes de desativar**: diferente de
 quando essa seção foi escrita pela primeira vez, o poller **já está em
@@ -476,11 +466,11 @@ específico.
   servidor.
 - **Reversão parcial** (só o boleto vence amanhã, mantendo os outros 3
   eventos): reverter só o commit que fez essa migração (app:
-  `0e958ed`; painel: o commit que adicionou `processar_vence_amanha()`
-  em `poller.py`) — isso restaura o `VencimentoWorker` local, mas exige
+  `0e958ed`; painel: o commit que adicionou o lembrete de véspera,
+  hoje `processar_vencimentos()` em `poller.py`) — isso restaura o `VencimentoWorker` local, mas exige
   reinstalar a build antiga do app em todo mundo, não é uma operação
   "só servidor".
-- **Reversão completa do código** (tira o piloto inteiro do histórico):
+- **Reversão completa do código** (tira o push por conta inteiro do histórico):
   `git revert` dos commits `511dff1`, `aafc78b`, `9f3fc35`, `d17298b`,
   `7efc461`, `8da1662`, `c40f361` neste repo, e
   `a076e19`/`cd90797`/`45bd4e4`/`e182c9f`/`0e958ed` no repo do app
