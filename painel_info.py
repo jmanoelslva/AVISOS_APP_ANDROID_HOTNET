@@ -93,6 +93,18 @@ def ultimos_avisos(eventos: list[dict], limite: int = 5) -> list[dict]:
     return [{**e, "relativo": hora_relativa(_quando(e), agora)} for e in avisos]
 
 
+def _intervalo_tipico(ciclos: list[dict]) -> timedelta:
+    """Mediana dos intervalos entre os últimos ciclos, ignorando os menores que 5 min
+    (ciclo rodado à mão logo depois de outro). Antes valia só o intervalo entre os
+    dois últimos: um `systemctl start` manual reduzia a 1 min e o painel acusava
+    "parado" em seguida."""
+    horas = [q for q in (_quando(c) for c in ciclos[:12]) if q]
+    intervalos = sorted(
+        d for d in (a - b for a, b in zip(horas, horas[1:])) if d >= timedelta(minutes=5)
+    )
+    return intervalos[len(intervalos) // 2] if intervalos else timedelta(hours=1)
+
+
 def status_poller(eventos: list[dict]) -> dict | None:
     """Último ciclo, próximo (pelo intervalo entre os dois últimos), falhas em 24h.
     None se o poller nunca registrou nada (instalação sem poller)."""
@@ -102,10 +114,7 @@ def status_poller(eventos: list[dict]) -> dict | None:
         return None
     agora = datetime.now()
     ultimo = _quando(ciclos[0]) if ciclos else None
-    anterior = _quando(ciclos[1]) if len(ciclos) > 1 else None
-    intervalo = (ultimo - anterior) if ultimo and anterior else timedelta(hours=1)
-    if intervalo <= timedelta(0):
-        intervalo = timedelta(hours=1)
+    intervalo = _intervalo_tipico(ciclos)
     proximo = ultimo + intervalo if ultimo else None
     falhas_24h = sum(1 for e in falhas if (q := _quando(e)) and agora - q <= timedelta(hours=24))
     parado = ultimo is None or agora - ultimo > 2 * intervalo
