@@ -11,6 +11,14 @@ systemctl restart aviso-broadcaster
 ```
 O poller roda por timer e usa o código novo no ciclo seguinte, sem reinício.
 
+## [1.6.3] - 2026-10-18
+Partes: poller.
+
+### Corrigido
+- Clientes recebiam "pagamento confirmado" de fatura antiga (ex.: mês 08). A busca de faturas ordenava por vencimento; com milhares de empates no mesmo dia, o Controllr repetia cerca de 1450 faturas e omitia outras tantas por consulta. A poda da 1.6.2 esquecia as omitidas e, quando voltavam, pareciam pagas agora. A busca ordena por `invoice_pk`, tira repetidos e falha se vier incompleta.
+- Busca de chamados também ordena por `ticket_pk` e confere o total.
+- Pagamento só é notificado com crédito de até 5 dias (`PAGAMENTO_DIAS_MAX`); fatura antiga que reaparece só é registrada.
+
 ## [1.6.2] - 2026-10-16
 Partes: painel, poller e scripts. Exige reinstalar dependências (Gunicorn 23).
 
@@ -204,6 +212,7 @@ Partes: painel e poller. Estado em produção desde o piloto.
 - `invoice_valid=false` é pagamento manual no escritório, não cliente inativo.
 - Pagamento confirmado usa `invoice_amount_paid` em vez de `invoice_amount_document`.
 
+[1.6.3]: https://github.com/jmanoelslva/AVISOS_APP_ANDROID_HOTNET/compare/v1.6.2...v1.6.3
 [1.6.2]: https://github.com/jmanoelslva/AVISOS_APP_ANDROID_HOTNET/compare/v1.6.1...v1.6.2
 [1.6.1]: https://github.com/jmanoelslva/AVISOS_APP_ANDROID_HOTNET/compare/v1.6.0...v1.6.1
 [1.6.0]: https://github.com/jmanoelslva/AVISOS_APP_ANDROID_HOTNET/compare/v1.5.0...v1.6.0

@@ -11,6 +11,16 @@ _OPER_GTE = 4
 _OPER_LTE = 3
 
 
+def _conferir_completa(itens: list[dict], chave: str, total, nome: str) -> list[dict]:
+    """Tira repetidos e falha se vier menos que o `total` informado pelo Controllr.
+    Lista incompleta não pode seguir: a poda do estado esqueceria o que faltou e,
+    quando voltasse, pareceria novidade (aviso repetido de pagamento antigo)."""
+    unicos = list({str(i.get(chave)): i for i in itens}.values())
+    if isinstance(total, int) and len(unicos) < total:
+        raise RuntimeError(f"Busca de {nome} incompleta: {len(unicos)} de {total}")
+    return unicos
+
+
 class ControllrClient:
     """Sessão HTTP como o usuário admin dedicado (só leitura), pro poller
     consultar faturas de TODOS os clientes — algo bloqueado pra sessão de
@@ -39,6 +49,12 @@ class ControllrClient:
         """Faturas com vencimento nos últimos `dias_janela` dias até 30 dias
         à frente — evita puxar o histórico inteiro a cada ciclo. Pagina em
         blocos de 200 até a resposta vir vazia.
+
+        Ordena por `invoice_pk` (único). Por `invoice_date_due` havia milhares de
+        empates no mesmo dia e o Controllr devolvia cada página numa ordem
+        diferente: ~1450 faturas repetidas e outras tantas faltando por consulta.
+        Com a poda do estado, a fatura que sumia e voltava parecia paga agora e
+        o cliente recebia "pagamento confirmado" de mês anterior.
         """
         hoje = datetime.date.today()
         inicio = (hoje - datetime.timedelta(days=dias_janela)).isoformat()
@@ -58,7 +74,7 @@ class ControllrClient:
                 data={
                     "action": "list",
                     "where": where,
-                    "sort": "invoice_date_due",
+                    "sort": "invoice_pk",
                     "dir": "ASC",
                     "start": start,
                     "limit": limite,
@@ -74,7 +90,7 @@ class ControllrClient:
             if len(pagina) < limite:
                 break
             start += limite
-        return faturas
+        return _conferir_completa(faturas, "invoice_pk", corpo.get("total"), "faturas")
 
     def buscar_chamados(self, dias_janela: int = 7, timeout: float = 30.0) -> list[dict]:
         """Chamados com atividade (ticket_date_last) nos últimos `dias_janela`
@@ -91,7 +107,14 @@ class ControllrClient:
         while True:
             resp = self._sessao.post(
                 self._base_url + "support_ctl/ticket/list",
-                data={"action": "list", "where": where, "start": start, "limit": limite},
+                data={
+                    "action": "list",
+                    "where": where,
+                    "sort": "ticket_pk",
+                    "dir": "ASC",
+                    "start": start,
+                    "limit": limite,
+                },
                 timeout=timeout,
             )
             resp.raise_for_status()
@@ -103,7 +126,7 @@ class ControllrClient:
             if len(pagina) < limite:
                 break
             start += limite
-        return chamados
+        return _conferir_completa(chamados, "ticket_pk", corpo.get("total"), "chamados")
 
     def ultimo_op_e_de_staff(self, ticket_pk: int, timeout: float = 15.0) -> bool:
         """True só se a operação mais recente do chamado foi escrita pela

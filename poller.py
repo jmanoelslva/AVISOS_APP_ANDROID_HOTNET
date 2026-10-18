@@ -69,6 +69,17 @@ def _fatura_vale_notificar(fatura: dict) -> bool:
     return not fatura.get("invoice_deleted")
 
 
+PAGAMENTO_DIAS_MAX = 5
+
+
+def _credito_recente(credito: str) -> bool:
+    try:
+        dia = datetime.date.fromisoformat(credito[:10])
+    except ValueError:
+        return False
+    return (datetime.date.today() - dia).days <= PAGAMENTO_DIAS_MAX
+
+
 def processar_pagamentos(faturas: list[dict], estado: dict, primeira_vez: bool) -> int:
     faturas_vistas = estado.setdefault("faturas", {})
     notificadas = 0
@@ -81,7 +92,15 @@ def processar_pagamentos(faturas: list[dict], estado: dict, primeira_vez: bool) 
         # quem já foi visto pago (evita reenviar todo ciclo), e nunca na
         # primeira execução (CRÍTICO: sem estado prévio, toda fatura já paga
         # dentro da janela pareceria "nova" e notificaria milhares de uma vez).
-        if credito_atual and not credito_anterior and not primeira_vez and _fatura_vale_notificar(fatura):
+        # Crédito com mais de PAGAMENTO_DIAS_MAX dias não é pagamento novo: é fatura
+        # que o poller deixou de ver e voltou a ver (ex.: a busca incompleta da 1.6.2).
+        if (
+            credito_atual
+            and not credito_anterior
+            and not primeira_vez
+            and _credito_recente(credito_atual)
+            and _fatura_vale_notificar(fatura)
+        ):
             cpf = fatura.get("client_doc1") or ""
             if cpf:
                 anotacao = {
