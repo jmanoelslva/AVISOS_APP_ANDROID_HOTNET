@@ -45,9 +45,9 @@ class ControllrClient:
         if not corpo.get("success"):
             raise RuntimeError(f"Login no Controllr falhou: {corpo}")
 
-    def buscar_faturas(self, dias_janela: int = 90, timeout: float = 30.0) -> list[dict]:
-        """Faturas com vencimento nos últimos `dias_janela` dias até 30 dias
-        à frente — evita puxar o histórico inteiro a cada ciclo. Pagina em
+    def buscar_faturas(self, dias_antes: int = 90, dias_depois: int = 30, timeout: float = 30.0) -> list[dict]:
+        """Faturas com vencimento nos últimos `dias_antes` dias até `dias_depois`
+        dias à frente (ajustáveis no painel) — evita puxar o histórico inteiro a cada ciclo. Pagina em
         blocos de 200 até a resposta vir vazia.
 
         Ordena por `invoice_pk` (único). Por `invoice_date_due` havia milhares de
@@ -57,8 +57,8 @@ class ControllrClient:
         o cliente recebia "pagamento confirmado" de mês anterior.
         """
         hoje = datetime.date.today()
-        inicio = (hoje - datetime.timedelta(days=dias_janela)).isoformat()
-        fim = (hoje + datetime.timedelta(days=30)).isoformat()
+        inicio = (hoje - datetime.timedelta(days=dias_antes)).isoformat()
+        fim = (hoje + datetime.timedelta(days=dias_depois)).isoformat()
         where = json.dumps([
             {"field": "invoice_date_due", "oper": _OPER_GTE, "value": inicio},
             {"field": "AND"},

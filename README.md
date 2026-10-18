@@ -328,6 +328,13 @@ pra quem já foi notificado:
   e lembrete de vencimento só saem nesse horário; fora dele esperam o
   primeiro ciclo dentro. Pagamento e chamado saem na hora. Configuração em
   `config.json` (chave `lembretes`), lida a cada ciclo — ver `lembretes.py`.
+- **Prazo do pagamento confirmado** (aba **Automáticos**, 1 a 30 dias,
+  padrão 5): só avisa pagamento com crédito de até N dias. Crédito mais antigo
+  é fatura que voltou à consulta, não pagamento novo.
+- **Busca no Controllr** (aba **Automáticos**): faturas com vencimento de N
+  dias atrás (15 a 90, padrão 90) até N dias à frente (7 a 90, padrão 30).
+  Ao aumentar a janela, as faturas antigas que entram não geram aviso de
+  atraso (o poller guarda o início da janela anterior em `janela_inicio`).
 - **Lembrete de vencimento**: `invoice_date_due` está a N dias e a fatura
   ainda não foi paga — empurrão único. N se escolhe no painel, aba
   **Automáticos** (véspera, 2 a 7 dias ou desativado; padrão véspera). A

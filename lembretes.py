@@ -7,6 +7,10 @@ e gravada em config.json na chave "lembretes":
 - inicio/fim: horário em que lembretes de vencimento e de atraso podem sair. Fora
   dele o poller espera o próximo ciclo dentro do horário (nada se perde).
   Pagamento confirmado e chamado respondido continuam saindo na hora.
+- pagamento_dias: só avisa pagamento com crédito de até N dias (1 a 30, padrão 5).
+  Crédito mais antigo é fatura que o poller voltou a ver, não pagamento novo.
+- janela_antes/janela_depois: faturas consultadas no Controllr, pelo vencimento,
+  de N dias atrás (15 a 90, padrão 90) até N dias à frente (7 a 90, padrão 30).
 """
 import datetime
 import json
@@ -17,7 +21,13 @@ CONFIG_PATH = Path(__file__).resolve().parent / "config.json"
 
 DESATIVADO = 0
 DIAS_PERMITIDOS = tuple(range(1, 8))
-PADRAO = {"dias_antes": 1, "atraso_ativo": True, "inicio": "08:00", "fim": "20:00"}
+PADRAO = {
+    "dias_antes": 1, "atraso_ativo": True, "inicio": "08:00", "fim": "20:00",
+    "pagamento_dias": 5, "janela_antes": 90, "janela_depois": 30,
+}
+# (mínimo, máximo) de cada campo numérico. janela_depois começa em 7 para cobrir
+# o maior dias_antes; janela_antes não passa de 90.
+LIMITES = {"pagamento_dias": (1, 30), "janela_antes": (15, 90), "janela_depois": (7, 90)}
 
 _HORA = re.compile(r"^([01]\d|2[0-3]):[0-5]\d$")
 
@@ -33,15 +43,30 @@ def normalizar(bruto) -> dict:
     if not (inicio and fim and inicio < fim):
         inicio, fim = PADRAO["inicio"], PADRAO["fim"]
     atraso = bruto.get("atraso_ativo")
-    return {
+    cfg = {
         "dias_antes": dias,
         "atraso_ativo": atraso if isinstance(atraso, bool) else PADRAO["atraso_ativo"],
         "inicio": inicio,
         "fim": fim,
     }
+    for campo, (minimo, maximo) in LIMITES.items():
+        valor = bruto.get(campo)
+        ok = isinstance(valor, int) and not isinstance(valor, bool) and minimo <= valor <= maximo
+        cfg[campo] = valor if ok else PADRAO[campo]
+    return cfg
 
 
-def validar_formulario(dias_antes: str, inicio: str, fim: str, atraso: str = "1") -> tuple[dict | None, str]:
+_NOMES = {
+    "pagamento_dias": "o prazo do pagamento confirmado",
+    "janela_antes": "a busca para trás",
+    "janela_depois": "a busca à frente",
+}
+
+
+def validar_formulario(
+    dias_antes: str, inicio: str, fim: str, atraso: str = "1",
+    pagamento_dias: str = "", janela_antes: str = "", janela_depois: str = "",
+) -> tuple[dict | None, str]:
     """Do formulário do painel: devolve (config, "") ou (None, motivo)."""
     try:
         dias = int(dias_antes)
@@ -55,7 +80,17 @@ def validar_formulario(dias_antes: str, inicio: str, fim: str, atraso: str = "1"
         return None, "o horário de início precisa ser antes do fim"
     if atraso not in ("0", "1"):
         return None, "escolha se o aviso de atraso fica ativado"
-    return {"dias_antes": dias, "atraso_ativo": atraso == "1", "inicio": inicio, "fim": fim}, ""
+    cfg = {"dias_antes": dias, "atraso_ativo": atraso == "1", "inicio": inicio, "fim": fim}
+    for campo, texto in (("pagamento_dias", pagamento_dias), ("janela_antes", janela_antes), ("janela_depois", janela_depois)):
+        minimo, maximo = LIMITES[campo]
+        try:
+            valor = int(texto)
+        except (TypeError, ValueError):
+            return None, f"preencha {_NOMES[campo]}"
+        if not minimo <= valor <= maximo:
+            return None, f"{_NOMES[campo]} precisa ficar entre {minimo} e {maximo} dias"
+        cfg[campo] = valor
+    return cfg, ""
 
 
 def ler() -> dict:
@@ -82,4 +117,8 @@ def descrever(cfg: dict) -> str:
     else:
         quando = "Na véspera do vencimento" if d == 1 else f"{d} dias antes do vencimento"
     atraso = "" if cfg.get("atraso_ativo", True) else " · aviso de atraso desativado"
-    return f"{quando}{atraso} · das {cfg['inicio']} às {cfg['fim']}"
+    return (
+        f"{quando}{atraso} · das {cfg['inicio']} às {cfg['fim']}"
+        f" · pagamento de até {cfg['pagamento_dias']} dias"
+        f" · busca de {cfg['janela_antes']} dias atrás a {cfg['janela_depois']} à frente"
+    )

@@ -69,18 +69,15 @@ def _fatura_vale_notificar(fatura: dict) -> bool:
     return not fatura.get("invoice_deleted")
 
 
-PAGAMENTO_DIAS_MAX = 5
-
-
-def _credito_recente(credito: str) -> bool:
+def _credito_recente(credito: str, dias_max: int) -> bool:
     try:
         dia = datetime.date.fromisoformat(credito[:10])
     except ValueError:
         return False
-    return (datetime.date.today() - dia).days <= PAGAMENTO_DIAS_MAX
+    return (datetime.date.today() - dia).days <= dias_max
 
 
-def processar_pagamentos(faturas: list[dict], estado: dict, primeira_vez: bool) -> int:
+def processar_pagamentos(faturas: list[dict], estado: dict, primeira_vez: bool, dias_max: int = 5) -> int:
     faturas_vistas = estado.setdefault("faturas", {})
     notificadas = 0
     for fatura in faturas:
@@ -92,13 +89,14 @@ def processar_pagamentos(faturas: list[dict], estado: dict, primeira_vez: bool) 
         # quem já foi visto pago (evita reenviar todo ciclo), e nunca na
         # primeira execução (CRÍTICO: sem estado prévio, toda fatura já paga
         # dentro da janela pareceria "nova" e notificaria milhares de uma vez).
-        # Crédito com mais de PAGAMENTO_DIAS_MAX dias não é pagamento novo: é fatura
-        # que o poller deixou de ver e voltou a ver (ex.: a busca incompleta da 1.6.2).
+        # Crédito com mais de `dias_max` dias (pagamento_dias, no painel) não é pagamento
+        # novo: é fatura que o poller deixou de ver e voltou a ver (ex.: a busca
+        # incompleta da 1.6.2, ou a janela de busca aumentada no painel).
         if (
             credito_atual
             and not credito_anterior
             and not primeira_vez
-            and _credito_recente(credito_atual)
+            and _credito_recente(credito_atual, dias_max)
             and _fatura_vale_notificar(fatura)
         ):
             cpf = fatura.get("client_doc1") or ""
@@ -138,11 +136,18 @@ def processar_pagamentos(faturas: list[dict], estado: dict, primeira_vez: bool) 
     return notificadas
 
 
-def processar_atrasos(faturas: list[dict], estado: dict, primeira_vez: bool, no_horario: bool = True, ativo: bool = True) -> int:
+def processar_atrasos(
+    faturas: list[dict], estado: dict, primeira_vez: bool, no_horario: bool = True,
+    ativo: bool = True, inicio_anterior: str = "",
+) -> int:
     """Reforço de atraso — um empurrão único quando a fatura vira atrasada
     (`invoice_late`), não um lembrete repetido enquanto ela continuar assim.
     Reaproveita a mesma lista de `buscar_faturas()` do pagamento confirmado
-    (mesma janela de 90 dias já cobre faturas vencidas), sem chamada extra.
+    (a mesma janela já cobre faturas vencidas), sem chamada extra.
+
+    `inicio_anterior`: início da janela no ciclo anterior. Fatura que vence antes
+    dele só apareceu porque a janela foi aumentada no painel: marca sem avisar,
+    senão todo atraso antigo sairia de uma vez.
     """
     atrasadas_vistas = estado.setdefault("faturas_atrasadas", {})
     if not ativo:
@@ -162,6 +167,7 @@ def processar_atrasos(faturas: list[dict], estado: dict, primeira_vez: bool, no_
             and not fatura.get("invoice_date_credit")
             and not ja_notificada
             and not primeira_vez
+            and (fatura.get("invoice_date_due") or "")[:10] >= inicio_anterior
             and _fatura_vale_notificar(fatura)
         ):
             if not no_horario:
@@ -278,9 +284,10 @@ def processar_vencimentos(faturas: list[dict], estado: dict, primeira_vez: bool,
 
 
 def podar_estado(faturas: list[dict], estado: dict) -> None:
-    """Esquece faturas que saíram da janela consultada (vencimento de 90 dias atrás a
-    30 à frente). A janela só anda para a frente: o que sai não volta, e sem a poda
-    o poller_state.json crescia para sempre."""
+    """Esquece faturas que saíram da janela consultada (janela_antes/janela_depois,
+    no painel). Sem a poda o poller_state.json crescia para sempre. O que volta
+    porque a janela foi aumentada não gera aviso repetido: pagamento tem a trava
+    de data do crédito, atraso a do início da janela anterior."""
     atuais = {str(f.get("invoice_pk")) for f in faturas}
     for categoria in ("faturas", "faturas_atrasadas", "faturas_vence_amanha"):
         vistas = estado.get(categoria)
@@ -367,19 +374,25 @@ def _ciclo() -> int:
         print(f"Falha ao logar no Controllr: {e}", file=sys.stderr)
         return 1
 
+    cfg_lembretes = lembretes.ler()
     try:
-        faturas = cliente.buscar_faturas()
+        faturas = cliente.buscar_faturas(cfg_lembretes["janela_antes"], cfg_lembretes["janela_depois"])
     except Exception as e:
         access_log.registrar("poller_falha", detalhes=f"busca de faturas: {e}")
         print(f"Falha ao consultar faturas: {e}", file=sys.stderr)
         return 1
 
-    cfg_lembretes = lembretes.ler()
     no_horario = lembretes.dentro_do_horario(cfg_lembretes)
-    notif_pagamentos = processar_pagamentos(faturas, estado, primeira_vez_pagamentos)
-    notif_atrasos = processar_atrasos(faturas, estado, primeira_vez_atrasos, no_horario, cfg_lembretes["atraso_ativo"])
+    inicio_janela = (datetime.date.today() - datetime.timedelta(days=cfg_lembretes["janela_antes"])).isoformat()
+    # Ausente (antes da 1.7.0): vale a janela atual, nenhuma fatura fica de fora.
+    inicio_anterior = estado.get("janela_inicio") or inicio_janela
+    notif_pagamentos = processar_pagamentos(faturas, estado, primeira_vez_pagamentos, cfg_lembretes["pagamento_dias"])
+    notif_atrasos = processar_atrasos(
+        faturas, estado, primeira_vez_atrasos, no_horario, cfg_lembretes["atraso_ativo"], inicio_anterior,
+    )
     notif_vencimentos = processar_vencimentos(faturas, estado, primeira_vez_vence_amanha, cfg_lembretes, no_horario)
     podar_estado(faturas, estado)
+    estado["janela_inicio"] = inicio_janela
     # Grava já: se os chamados falharem abaixo, os avisos de fatura que acabaram de
     # sair não podem ser reenviados no próximo ciclo (antes eram).
     state_store.salvar(estado)

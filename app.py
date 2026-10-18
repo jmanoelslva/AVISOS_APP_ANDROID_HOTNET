@@ -442,7 +442,7 @@ def modelos():
 @requer("ver_automaticos")
 def automaticos():
     """Notificações que o poller manda sozinho: funcionamento, contagem do dia e
-    lembretes (antecedência e horário). Alterar exige a permissão "lembretes"."""
+    lembretes (antecedência, horário, prazo do pagamento e janela de busca). Alterar exige a permissão "lembretes"."""
     cfg = config_store.carregar()
 
     if request.method == "POST":
@@ -454,9 +454,12 @@ def automaticos():
             request.form.get("inicio", ""),
             request.form.get("fim", ""),
             request.form.get("atraso_ativo", ""),
+            request.form.get("pagamento_dias", ""),
+            request.form.get("janela_antes", ""),
+            request.form.get("janela_depois", ""),
         )
         if erro:
-            flash("Lembretes não salvos: " + erro + ".", "erro")
+            flash("Ajustes não salvos: " + erro + ".", "erro")
         else:
             cfg["lembretes"] = novo
             config_store.salvar(cfg)
@@ -464,7 +467,7 @@ def automaticos():
                 "lembretes_alterados", usuario=session.get("usuario", ""),
                 ip=_ip_do_cliente(), detalhes=lembretes.descrever(novo),
             )
-            flash("Lembretes salvos: " + lembretes.descrever(novo) + ". Valem a partir do próximo ciclo, sem reiniciar nada.", "sucesso")
+            flash("Ajustes salvos: " + lembretes.descrever(novo) + ". Valem a partir do próximo ciclo, sem reiniciar nada.", "sucesso")
         return redirect(url_for("automaticos"))
 
     eventos = access_log.listar(limite=access_log.MAX_LINHAS)
@@ -475,6 +478,7 @@ def automaticos():
         lembretes=lembretes.normalizar(cfg.get("lembretes")),
         dias_permitidos=lembretes.DIAS_PERMITIDOS,
         desativado=lembretes.DESATIVADO,
+        limites=lembretes.LIMITES,
     )
 
 

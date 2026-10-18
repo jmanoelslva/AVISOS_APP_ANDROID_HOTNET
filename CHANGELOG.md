@@ -11,6 +11,16 @@ systemctl restart aviso-broadcaster
 ```
 O poller roda por timer e usa o código novo no ciclo seguinte, sem reinício.
 
+## [1.7.0] - 2026-10-18
+Partes: painel e poller.
+
+### Adicionado
+- Aba Automáticos: prazo do pagamento confirmado (1 a 30 dias, padrão 5), que substitui a constante `PAGAMENTO_DIAS_MAX` da 1.6.3.
+- Aba Automáticos: janela de busca de faturas, de 15 a 90 dias atrás (padrão 90) e de 7 a 90 dias à frente (padrão 30).
+
+### Corrigido
+- Aumentar a janela de busca não dispara avisos de atraso de faturas antigas: as que vencem antes do início da janela anterior só são marcadas.
+
 ## [1.6.3] - 2026-10-18
 Partes: poller.
 
@@ -212,6 +222,7 @@ Partes: painel e poller. Estado em produção desde o piloto.
 - `invoice_valid=false` é pagamento manual no escritório, não cliente inativo.
 - Pagamento confirmado usa `invoice_amount_paid` em vez de `invoice_amount_document`.
 
+[1.7.0]: https://github.com/jmanoelslva/AVISOS_APP_ANDROID_HOTNET/compare/v1.6.3...v1.7.0
 [1.6.3]: https://github.com/jmanoelslva/AVISOS_APP_ANDROID_HOTNET/compare/v1.6.2...v1.6.3
 [1.6.2]: https://github.com/jmanoelslva/AVISOS_APP_ANDROID_HOTNET/compare/v1.6.1...v1.6.2
 [1.6.1]: https://github.com/jmanoelslva/AVISOS_APP_ANDROID_HOTNET/compare/v1.6.0...v1.6.1

@@ -19,6 +19,7 @@
         .ajuste > div:first-child small { color: var(--cor-texto-secundario); font-size: 12px; }
         .horas { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
         .horas input { width: auto; padding: 7px 10px; }
+        .horas input[type=number] { width: 5.5em; }
         .trilha { position: relative; height: 26px; margin-top: 10px; border-radius: 7px; background: var(--cor-superficie-2); border: 1px solid var(--cor-borda); overflow: hidden; }
         .trilha .faixa { position: absolute; top: 0; bottom: 0; background: var(--cor-sucesso-bg); border-left: 2px solid var(--cor-sucesso); border-right: 2px solid var(--cor-sucesso); }
         .trilha .marcas { position: absolute; inset: 0; display: flex; justify-content: space-between; align-items: center; padding: 0 6px; font-size: 10.5px; color: var(--cor-texto-secundario); font-variant-numeric: tabular-nums; }
@@ -59,7 +60,7 @@
         {% endif %}
         <div class="tipos">
             <span class="rotulo">Enviados hoje</span>
-            <div class="tipo"><div><b>Pagamento confirmado</b><small>Na hora, com a data do pagamento</small></div><span class="etiqueta p">{{ contagens.pagamentos }}</span></div>
+            <div class="tipo"><div><b>Pagamento confirmado</b><small>Na hora, se pago há até {{ lembretes.pagamento_dias }} {{ 'dia' if lembretes.pagamento_dias == 1 else 'dias' }}</small></div><span class="etiqueta p">{{ contagens.pagamentos }}</span></div>
             <div class="tipo"><div><b>Chamado respondido</b><small>Na hora</small></div><span class="etiqueta p">{{ contagens.chamados }}</span></div>
             <div class="tipo"><div><b>Boleto em atraso</b><small>{% if lembretes.atraso_ativo %}Uma vez por boleto, dentro do horário{% else %}Desativado{% endif %}</small></div><span class="etiqueta p">{{ contagens.atrasos }}</span></div>
             <div class="tipo"><div><b>Lembrete de vencimento</b><small id="resumoLembrete">{% if lembretes.dias_antes == desativado %}Desativado{% elif lembretes.dias_antes == 1 %}Na véspera, dentro do horário{% else %}{{ lembretes.dias_antes }} dias antes, dentro do horário{% endif %}</small></div><span class="etiqueta p">{{ contagens.lembretes }}</span></div>
@@ -105,9 +106,33 @@
                         <p class="dica">Fora do horário, o aviso espera o primeiro ciclo dentro dele. Nada se perde.</p>
                     </div>
                 </div>
+                <div class="ajuste">
+                    <div><b>Pagamento confirmado</b><small>Prazo desde o crédito</small></div>
+                    <div>
+                        <div class="horas">
+                            <label for="pagDias">Avisar se pago há até</label>
+                            <input type="number" id="pagDias" name="pagamento_dias" value="{{ lembretes.pagamento_dias }}" min="{{ limites.pagamento_dias[0] }}" max="{{ limites.pagamento_dias[1] }}" step="1" required>
+                            <span>dias</span>
+                        </div>
+                        <p class="dica">Pagamento mais antigo que isso não é avisado: é fatura que voltou à consulta, não pagamento novo. Padrão: 5 dias.</p>
+                    </div>
+                </div>
+                <div class="ajuste">
+                    <div><b>Busca no Controllr</b><small>Faturas consultadas pelo vencimento</small></div>
+                    <div>
+                        <div class="horas">
+                            <label for="janAntes">De</label>
+                            <input type="number" id="janAntes" name="janela_antes" value="{{ lembretes.janela_antes }}" min="{{ limites.janela_antes[0] }}" max="{{ limites.janela_antes[1] }}" step="1" required>
+                            <label for="janDepois">dias atrás até</label>
+                            <input type="number" id="janDepois" name="janela_depois" value="{{ lembretes.janela_depois }}" min="{{ limites.janela_depois[0] }}" max="{{ limites.janela_depois[1] }}" step="1" required>
+                            <span>dias à frente</span>
+                        </div>
+                        <p class="dica">Para trás: {{ limites.janela_antes[0] }} a {{ limites.janela_antes[1] }} dias. À frente: {{ limites.janela_depois[0] }} a {{ limites.janela_depois[1] }} dias. Padrão: 90 atrás e 30 à frente. Ao aumentar, as faturas antigas que entram na busca não geram aviso.</p>
+                    </div>
+                </div>
                 <div class="frase" id="frase" aria-live="polite"></div>
                 {% if 'lembretes' in pode %}
-                <div class="acoes" style="margin-top:14px"><button type="submit">Salvar lembretes</button><p class="dica">Vale a partir do próximo ciclo, sem reiniciar nada.</p></div>
+                <div class="acoes" style="margin-top:14px"><button type="submit">Salvar ajustes</button><p class="dica">Vale a partir do próximo ciclo, sem reiniciar nada.</p></div>
                 {% endif %}
             </fieldset>
         </form>
