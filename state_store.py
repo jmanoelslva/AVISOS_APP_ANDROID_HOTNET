@@ -1,9 +1,14 @@
 import json
 import os
+import shutil
 import tempfile
 from pathlib import Path
 
 STATE_PATH = Path(__file__).resolve().parent / "poller_state.json"
+
+# Folga mínima no disco para o ciclo começar: o estado, o envios.log e o
+# acessos.log são regravados inteiros a cada ciclo.
+MIN_LIVRE = 50 * 1024 * 1024
 
 
 def carregar() -> dict:
@@ -40,3 +45,13 @@ def salvar(estado: dict) -> None:
         except OSError:
             pass
         raise
+
+
+def conferir_gravacao(estado: dict) -> None:
+    """Antes de enviar qualquer aviso: confere a folga no disco e regrava o estado
+    atual. Com o disco cheio (19/10/2026) os avisos saíam, o estado não gravava e o
+    ciclo seguinte reenviava os mesmos pagamentos. Levanta OSError se não der."""
+    livre = shutil.disk_usage(STATE_PATH.parent).free
+    if livre < MIN_LIVRE:
+        raise OSError(f"pouco espaço em disco ({livre // (1024 * 1024)} MB livres)")
+    salvar(estado)

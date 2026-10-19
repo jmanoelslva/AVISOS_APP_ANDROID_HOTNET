@@ -11,6 +11,12 @@ systemctl restart aviso-broadcaster
 ```
 O poller roda por timer e usa o código novo no ciclo seguinte, sem reinício.
 
+## [1.7.3] - 2026-10-19
+Partes: poller.
+
+### Corrigido
+- Com o disco cheio, o poller enviava os avisos de pagamento, não conseguia gravar o estado e o ciclo seguinte reenviava os mesmos avisos. Agora, antes de enviar, confere se há ao menos 50 MB livres e regrava o estado atual; se não der, cancela o ciclo sem notificar ninguém e registra "Falha automática" no painel.
+
 ## [1.7.2] - 2026-10-19
 Partes: painel e poller.
 
@@ -234,6 +240,7 @@ Partes: painel e poller. Estado em produção desde o piloto.
 - `invoice_valid=false` é pagamento manual no escritório, não cliente inativo.
 - Pagamento confirmado usa `invoice_amount_paid` em vez de `invoice_amount_document`.
 
+[1.7.3]: https://github.com/jmanoelslva/AVISOS_APP_ANDROID_HOTNET/compare/v1.7.2...v1.7.3
 [1.7.2]: https://github.com/jmanoelslva/AVISOS_APP_ANDROID_HOTNET/compare/v1.7.1...v1.7.2
 [1.7.1]: https://github.com/jmanoelslva/AVISOS_APP_ANDROID_HOTNET/compare/v1.7.0...v1.7.1
 [1.7.0]: https://github.com/jmanoelslva/AVISOS_APP_ANDROID_HOTNET/compare/v1.6.3...v1.7.0

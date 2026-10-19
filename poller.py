@@ -366,6 +366,13 @@ def _ciclo() -> int:
     primeira_vez_vence_amanha = "faturas_vence_amanha" not in estado
     primeira_vez_chamados = "chamados" not in estado
 
+    try:
+        state_store.conferir_gravacao(estado)
+    except OSError as e:
+        access_log.registrar("poller_falha", detalhes=f"gravar estado, nenhum aviso enviado: {e}")
+        print(f"Estado não grava, ciclo cancelado sem enviar: {e}", file=sys.stderr)
+        return 1
+
     cliente = ControllrClient(cfg["base_url"], cfg["usuario"], cfg["senha"])
     try:
         cliente.login()
