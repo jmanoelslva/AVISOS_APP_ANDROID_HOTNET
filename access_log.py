@@ -1,4 +1,7 @@
 import json
+import os
+import sys
+import tempfile
 import threading
 import time
 from contextlib import contextmanager
@@ -54,8 +57,23 @@ def registrar(evento: str, usuario: str = "", ip: str = "", detalhes: str = "", 
                 linhas = f.readlines()
         linhas.append(json.dumps(entrada, ensure_ascii=False) + "\n")
         linhas = linhas[-MAX_LINHAS:]
-        with open(LOG_PATH, "w", encoding="utf-8") as f:
-            f.writelines(linhas)
+        # Temporário + troca: com disco cheio, o "w" direto zerava o arquivo e o
+        # histórico inteiro se perdia. Falha de log não derruba login nem o poller.
+        try:
+            fd, temporario = tempfile.mkstemp(prefix=".acessos-", dir=LOG_PATH.parent)
+            try:
+                with os.fdopen(fd, "w", encoding="utf-8") as f:
+                    f.writelines(linhas)
+                os.chmod(temporario, 0o644)
+                os.replace(temporario, LOG_PATH)
+            except BaseException:
+                try:
+                    os.unlink(temporario)
+                except OSError:
+                    pass
+                raise
+        except OSError as erro:
+            print(f"acessos.log: evento {evento} não gravado: {erro}", file=sys.stderr)
 
 
 def listar(limite: int = 200) -> list[dict]:

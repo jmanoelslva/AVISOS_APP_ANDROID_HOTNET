@@ -11,6 +11,12 @@ systemctl restart aviso-broadcaster
 ```
 O poller roda por timer e usa o código novo no ciclo seguinte, sem reinício.
 
+## [1.7.2] - 2026-10-19
+Partes: painel e poller.
+
+### Corrigido
+- Com o disco do servidor cheio, o login dava "Internal Server Error" e o `acessos.log` era zerado, perdendo o histórico. A gravação agora usa um arquivo temporário e troca de uma vez; se falhar, o evento vai para o journal e o login segue normalmente.
+
 ## [1.7.1] - 2026-10-18
 Partes: painel.
 
@@ -228,6 +234,7 @@ Partes: painel e poller. Estado em produção desde o piloto.
 - `invoice_valid=false` é pagamento manual no escritório, não cliente inativo.
 - Pagamento confirmado usa `invoice_amount_paid` em vez de `invoice_amount_document`.
 
+[1.7.2]: https://github.com/jmanoelslva/AVISOS_APP_ANDROID_HOTNET/compare/v1.7.1...v1.7.2
 [1.7.1]: https://github.com/jmanoelslva/AVISOS_APP_ANDROID_HOTNET/compare/v1.7.0...v1.7.1
 [1.7.0]: https://github.com/jmanoelslva/AVISOS_APP_ANDROID_HOTNET/compare/v1.6.3...v1.7.0
 [1.6.3]: https://github.com/jmanoelslva/AVISOS_APP_ANDROID_HOTNET/compare/v1.6.2...v1.6.3
